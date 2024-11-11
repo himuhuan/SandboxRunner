@@ -1,0 +1,19 @@
+BasedOnStyle: Microsoft
+AccessModifierOffset: -4
+IndentWidth: 4
+UseTab: Never
+ColumnLimit: 120
+AlignConsecutiveMacros: AcrossEmptyLinesAndComments
+IncludeBlocks: Preserve
+SortIncludes: Never
+AlignAfterOpenBracket: Align
+AllowAllParametersOfDeclarationOnNextLine: true
+BinPackParameters: false
+AlignConsecutiveAssignments:
+  Enabled:         true
+  AcrossEmptyLines: false
+  AcrossComments:  false
+  AlignCompound:   false
+  PadOperators:    false
+
+BreakBeforeBinaryOperators: NonAssignment
