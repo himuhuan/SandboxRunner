@@ -3,3 +3,8 @@ out/
 *.exe
 *.dll
 *.pdb
+
+# No IDE files
+.vs/
+.idea/
+.vscode/

@@ -7,6 +7,7 @@
 
 #include "SandboxTest.h"
 #include <filesystem>
+#include <string_view>
 
 #define INIT_SANDBOX_TESTCASE(TestName)                                                                                \
     SandboxResult result{};                                                                                            \
@@ -23,7 +24,8 @@
     configuration.MaxMemory       = 128 * 1024 * 1024;                                                                 \
     configuration.MaxCpuTime      = 1000;                                                                              \
     configuration.MaxOutputSize   = 10 * 1024;                                                                         \
-    configuration.MaxProcessCount = 0;
+    configuration.MaxProcessCount = 0;                                                                                 \
+    configuration.Policy          = CXX_PROGRAM
 
 std::string_view GetStatusName(SandboxStatus status)
 {
@@ -162,3 +164,16 @@ TEST(SandboxTest, ExpectedProcessLimitExceeded)
     ASSERT_EQ(result.Status, SANDBOX_STATUS_RUNTIME_ERROR);
 }
 
+TEST(SandboxTest, ExpectedKilledBySecomp)
+{
+    INIT_SANDBOX_TESTCASE(ExpectedKilledBySecomp);
+    ASSERT_EQ(StartSandbox(&configuration, &result), SANDBOX_STATUS_SUCCESS);
+    PrintResult(result);
+    ASSERT_EQ(result.Status, SANDBOX_STATUS_RUNTIME_ERROR);
+}
+
+int main(int argc, char **argv)
+{
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}
