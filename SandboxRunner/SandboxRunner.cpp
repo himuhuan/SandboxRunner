@@ -47,7 +47,7 @@ SandboxConfiguration GetSandboxConfiguration(int argc, char **argv)
     parser.add<uint64_t>("process", 0, "Process count limit of the task", false, 0);
     parser.add<uint64_t>("output-size", 0, "Output size limit of the task", false, 0);
     parser.add<std::string>("policy", 'p', "The policy of the task", false, "default",
-                            cmdline::oneof("default", "cxx"));
+                            cmdline::oneof<std::string>("default", "cxx"));
     parser.footer("program [args...]");
 
     parser.parse(argc, argv);
@@ -65,9 +65,9 @@ SandboxConfiguration GetSandboxConfiguration(int argc, char **argv)
     
     configuration.WorkingDirectory = CopyString(parser.get<std::string>("dir"));
     configuration.InputFile        = CopyString(parser.get<std::string>("input"));
-    configuration.OutputFile       = CopyString(parser.get<std::string>("error"));
-    configuration.LogFile          = CopyString(parser.get<std::string>("output"));
-    configuration.ErrorFile        = CopyString(parser.get<std::string>("log"));
+    configuration.OutputFile       = CopyString(parser.get<std::string>("output"));
+    configuration.LogFile          = CopyString(parser.get<std::string>("log"));
+    configuration.ErrorFile        = CopyString(parser.get<std::string>("error"));
     configuration.MaxMemory        = parser.get<uint64_t>("memory");
     configuration.MaxStack         = parser.get<uint64_t>("stack");
     configuration.MaxCpuTime       = parser.get<uint64_t>("cpu");

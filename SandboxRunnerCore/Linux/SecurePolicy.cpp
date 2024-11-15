@@ -38,6 +38,7 @@ bool ApplyCxxProgramPolicy(const char *programPath, const SandboxConfiguration *
         SCMP_SYS(pread64),
         SCMP_SYS(prlimit64),
         SCMP_SYS(prctl),
+        SCMP_SYS(pipe2),
         SCMP_SYS(read),
         SCMP_SYS(readlink),
         SCMP_SYS(readv),
@@ -47,6 +48,7 @@ bool ApplyCxxProgramPolicy(const char *programPath, const SandboxConfiguration *
         SCMP_SYS(write),
         SCMP_SYS(writev),
         SCMP_SYS(seccomp),
+        SCMP_SYS(ioctl),
         SCMP_SYS(set_tid_address),
         SCMP_SYS(rt_sigprocmask),
 

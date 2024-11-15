@@ -18,10 +18,17 @@ extern "C"
 {
     constexpr int MAX_ENVIRONMENT_VARIABLES = 256;
 
+    /**
+     * @brief The maximum memory for the sandboxed process, byte
+     */
+    constexpr uint64_t MAX_MEMORY_FOR_SANDBOX_PROCESS = 0x7FFFFFFF;
+
     enum SandboxSecurePolicy
     {
         DEFAULT     = 0,
-        CXX_PROGRAM = 1
+        CXX_PROGRAM = 1,
+
+        MAX_POLICY
     };
 
     struct SandboxConfiguration
@@ -81,6 +88,8 @@ extern "C"
         SANDBOX_STATUS_REAL_TIME_LIMIT_EXCEEDED,
         SANDBOX_STATUS_PROCESS_LIMIT_EXCEEDED,
         SANDBOX_STATUS_OUTPUT_LIMIT_EXCEEDED,
+        SANDBOX_STATUS_ILLEGAL_OPERATION,
+
         SANDBOX_STATUS_INTERNAL_ERROR = 0xFFFF
     };
 
@@ -90,6 +99,11 @@ extern "C"
      * @return SandboxStatus If the function succeeds, it returns SANDBOX_STATUS_SUCCESS
      */
     int StartSandbox(const SandboxConfiguration *config, SandboxResult *result);
+
+    /**
+     * @brief Check if the configuration is valid
+     */
+    bool IsSandboxConfigurationVaild(const SandboxConfiguration *config);
 }
 
 class SandboxImpl;

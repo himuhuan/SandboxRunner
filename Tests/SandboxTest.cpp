@@ -14,7 +14,7 @@
     SandboxConfiguration configuration{};                                                                              \
     configuration.TaskName        = #TestName;                                                                         \
     auto currentDirectory         = std::filesystem::current_path();                                                   \
-    std::string executable        = (currentDirectory / "Samples" / #TestName).string();                               \
+    std::string executable        = (currentDirectory / "Samples" / #TestName).string();                   \
     std::string inputFile         = (currentDirectory / "TestData" / "test_data.in").string();                         \
     std::string outputFile        = (currentDirectory / "TestData" / #TestName ".out").string();                       \
     configuration.UserCommand     = executable.c_str();                                                                \
@@ -45,6 +45,8 @@ std::string_view GetStatusName(SandboxStatus status)
         return "SANDBOX_STATUS_PROCESS_LIMIT_EXCEEDED";
     case SANDBOX_STATUS_OUTPUT_LIMIT_EXCEEDED:
         return "SANDBOX_STATUS_OUTPUT_LIMIT_EXCEEDED";
+    case SANDBOX_STATUS_ILLEGAL_OPERATION:
+        return "SANDBOX_STATUS_ILLEGAL_OPERATION";
     default:
         return "SANDBOX_STATUS_INTERNAL_ERROR";
     }
@@ -161,7 +163,9 @@ TEST(SandboxTest, ExpectedProcessLimitExceeded)
     INIT_SANDBOX_TESTCASE(ExpectedProcessLimitExceeded);
     ASSERT_EQ(StartSandbox(&configuration, &result), SANDBOX_STATUS_SUCCESS);
     PrintResult(result);
-    ASSERT_EQ(result.Status, SANDBOX_STATUS_RUNTIME_ERROR);
+    // Killed by seccomp policy (try to call fork) rather than the ulimit
+    // so SANDBOX_STATUS_PROCESS_LIMIT_EXCEEDED may never be used in some policies
+    ASSERT_EQ(result.Status, SANDBOX_STATUS_ILLEGAL_OPERATION);
 }
 
 TEST(SandboxTest, ExpectedKilledBySecomp)
@@ -169,7 +173,16 @@ TEST(SandboxTest, ExpectedKilledBySecomp)
     INIT_SANDBOX_TESTCASE(ExpectedKilledBySecomp);
     ASSERT_EQ(StartSandbox(&configuration, &result), SANDBOX_STATUS_SUCCESS);
     PrintResult(result);
+    ASSERT_EQ(result.Status, SANDBOX_STATUS_ILLEGAL_OPERATION);
+}
+
+TEST(SandboxTest, ExpectedStackOverflow)
+{
+    INIT_SANDBOX_TESTCASE(ExpectedStackOverflow);
+    ASSERT_EQ(StartSandbox(&configuration, &result), SANDBOX_STATUS_SUCCESS);
+    PrintResult(result);
     ASSERT_EQ(result.Status, SANDBOX_STATUS_RUNTIME_ERROR);
+    ASSERT_EQ(result.Signal, SIGSEGV);
 }
 
 int main(int argc, char **argv)

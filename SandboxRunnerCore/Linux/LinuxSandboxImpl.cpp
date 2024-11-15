@@ -116,7 +116,7 @@ int SandboxImpl::Run()
                      && _result.RealTimeUsage >= _config->MaxRealTime)
                 _result.Status = SANDBOX_STATUS_REAL_TIME_LIMIT_EXCEEDED;
             else
-                _result.Status = SANDBOX_STATUS_RUNTIME_ERROR;
+                _result.Status = (_result.Signal == SIGSYS) ? SANDBOX_STATUS_ILLEGAL_OPERATION : SANDBOX_STATUS_RUNTIME_ERROR;
         }
 
         if (_config->MaxMemory != UNLIMITED && _result.MemoryUsage >= _config->MaxMemory)
