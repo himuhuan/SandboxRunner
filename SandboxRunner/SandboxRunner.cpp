@@ -74,7 +74,17 @@ SandboxConfiguration GetSandboxConfiguration(int argc, char **argv)
     configuration.MaxRealTime      = parser.get<uint64_t>("real");
     configuration.MaxProcessCount  = parser.get<int>("process");
     configuration.MaxOutputSize    = parser.get<uint64_t>("output-size");
-    configuration.UserCommand      = CopyString(parser.rest()[0]);
+    
+    if (parser.rest().empty())
+    {
+        fprintf(stderr, "No command specified\n");
+        fprintf(stderr, "%s", parser.usage().c_str());
+        exit(1);
+    }
+    else
+    {
+        configuration.UserCommand = CopyString(parser.rest()[0]);
+    }
 
     return configuration;
 }
