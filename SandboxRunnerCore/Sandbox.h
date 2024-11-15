@@ -16,8 +16,20 @@ constexpr int SANDBOX_VERSION = 0x010302;
 /* Public APIs */
 extern "C"
 {
-
     constexpr int MAX_ENVIRONMENT_VARIABLES = 256;
+
+    /**
+     * @brief The maximum memory for the sandboxed process, byte
+     */
+    constexpr uint64_t MAX_MEMORY_FOR_SANDBOX_PROCESS = 0x7FFFFFFF;
+
+    enum SandboxSecurePolicy
+    {
+        DEFAULT     = 0,
+        CXX_PROGRAM = 1,
+
+        MAX_POLICY
+    };
 
     struct SandboxConfiguration
     {
@@ -26,10 +38,10 @@ extern "C"
         const char *WorkingDirectory;       // The working directory for the sandboxed process
         const char *EnvironmentVariables;   // The environment variables for the sandboxed process
         uint16_t EnvironmentVariablesCount; // The count of environment variables
-        const char *InputFile;    // Redirect the input file for the sandboxed process, NULL means no redirection
-        const char *OutputFile;   // Redirect the output file for the sandboxed process, NULL means no redirection
-        const char *ErrorFile;    // Redirect the error file for the sandboxed process, NULL means no redirection
-        const char *LogFile;      // Redirect the log file for the sandboxed process, NULL means write to stderr
+        const char *InputFile;  // Redirect the input file for the sandboxed process, NULL means no redirection
+        const char *OutputFile; // Redirect the output file for the sandboxed process, NULL means no redirection
+        const char *ErrorFile;  // Redirect the error file for the sandboxed process, NULL means no redirection
+        const char *LogFile;    // Redirect the log file for the sandboxed process, NULL means write to stderr
 
         /**
          * @brief
@@ -48,16 +60,13 @@ extern "C"
          */
         uint64_t MaxMemoryToCrash;
 
-        uint64_t MaxMemory;       // The limit of memory, byte, 0 means no limit. (Soft limit)
-        uint64_t MaxStack;        // The limit of stack, byte, 0 means no limit.
-        uint64_t MaxCpuTime;      // The limit of CPU time, ms, 0 means no limit.
-        uint64_t MaxRealTime;     // The limit of real time, ms, 0 means no limit.
+        uint64_t MaxMemory;     // The limit of memory, byte, 0 means no limit. (Soft limit)
+        uint64_t MaxStack;      // The limit of stack, byte, 0 means no limit.
+        uint64_t MaxCpuTime;    // The limit of CPU time, ms, 0 means no limit.
+        uint64_t MaxRealTime;   // The limit of real time, ms, 0 means no limit.
+        uint64_t MaxOutputSize; // The limit of output size, byte, 0 means no limit.
         int MaxProcessCount; // The limit of child process count, -1 means no limit.
-        uint64_t MaxOutputSize;   // The limit of output size, byte, 0 means no limit.
-
-        // The name of the policy, NULL means no policy
-        // Some policies may NOT BE SUPPORTED in some platforms
-        const char *SystemPolicyName;
+        int Policy;          // The policy of the sandboxed process
     };
 
     struct SandboxResult
@@ -79,6 +88,8 @@ extern "C"
         SANDBOX_STATUS_REAL_TIME_LIMIT_EXCEEDED,
         SANDBOX_STATUS_PROCESS_LIMIT_EXCEEDED,
         SANDBOX_STATUS_OUTPUT_LIMIT_EXCEEDED,
+        SANDBOX_STATUS_ILLEGAL_OPERATION,
+
         SANDBOX_STATUS_INTERNAL_ERROR = 0xFFFF
     };
 
@@ -88,6 +99,11 @@ extern "C"
      * @return SandboxStatus If the function succeeds, it returns SANDBOX_STATUS_SUCCESS
      */
     int StartSandbox(const SandboxConfiguration *config, SandboxResult *result);
+
+    /**
+     * @brief Check if the configuration is valid
+     */
+    bool IsSandboxConfigurationVaild(const SandboxConfiguration *config);
 }
 
 class SandboxImpl;
@@ -98,7 +114,6 @@ class SandboxImpl;
  */
 class Sandbox
 {
-private:
     std::unique_ptr<SandboxImpl> _impl;
 
 public:
@@ -110,10 +125,10 @@ public:
         std::unique_ptr<Sandbox> CreatedSandbox;
     };
 
-    Sandbox(const Sandbox &) = delete;
+    Sandbox(const Sandbox &)            = delete;
     Sandbox &operator=(const Sandbox &) = delete;
-    Sandbox(Sandbox &&) = delete;
-    Sandbox &operator=(Sandbox &&) = delete;
+    Sandbox(Sandbox &&)                 = delete;
+    Sandbox &operator=(Sandbox &&)      = delete;
 
     ~Sandbox() = default;
 

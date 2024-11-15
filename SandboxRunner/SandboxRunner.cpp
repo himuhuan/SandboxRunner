@@ -9,6 +9,7 @@ int main(int argc, char *argv[])
 {
     SandboxConfiguration configuration = GetSandboxConfiguration(argc, argv);
     SandboxResult result{};
+    
     if (int status = StartSandbox(&configuration, &result); status != SANDBOX_STATUS_SUCCESS)
     {
         fprintf(stderr, "Failed to start sandbox\n");
@@ -24,6 +25,7 @@ char *CopyString(const std::string &s)
 {
     if (s.empty())
         return nullptr;
+
     return strdup(s.c_str());
 }
 
@@ -44,12 +46,14 @@ SandboxConfiguration GetSandboxConfiguration(int argc, char **argv)
     parser.add<uint64_t>("real", 0, "Real time limit of the task", false, 0);
     parser.add<uint64_t>("process", 0, "Process count limit of the task", false, 0);
     parser.add<uint64_t>("output-size", 0, "Output size limit of the task", false, 0);
-    parser.add<std::string>("policy", 'p', "The policy of the task", false, "default");
+    parser.add<std::string>("policy", 'p', "The policy of the task", false, "default",
+                            cmdline::oneof<std::string>("default", "cxx"));
     parser.footer("program [args...]");
 
     parser.parse(argc, argv);
 
     SandboxConfiguration configuration{};
+
     // do not worry about memory leak --- always runs once and exit.
 
     configuration.TaskName = CopyString(parser.get<std::string>("name"));
@@ -58,20 +62,29 @@ SandboxConfiguration GetSandboxConfiguration(int argc, char **argv)
         std::string randomName = to_string(uuids::uuid_system_generator{}());
         configuration.TaskName = CopyString(randomName);
     }
-
+    
     configuration.WorkingDirectory = CopyString(parser.get<std::string>("dir"));
     configuration.InputFile        = CopyString(parser.get<std::string>("input"));
-    configuration.OutputFile        = CopyString(parser.get<std::string>("error"));
-    configuration.LogFile        = CopyString(parser.get<std::string>("output"));
-    configuration.ErrorFile         = CopyString(parser.get<std::string>("log"));
+    configuration.OutputFile       = CopyString(parser.get<std::string>("output"));
+    configuration.LogFile          = CopyString(parser.get<std::string>("log"));
+    configuration.ErrorFile        = CopyString(parser.get<std::string>("error"));
     configuration.MaxMemory        = parser.get<uint64_t>("memory");
     configuration.MaxStack         = parser.get<uint64_t>("stack");
     configuration.MaxCpuTime       = parser.get<uint64_t>("cpu");
     configuration.MaxRealTime      = parser.get<uint64_t>("real");
     configuration.MaxProcessCount  = parser.get<int>("process");
     configuration.MaxOutputSize    = parser.get<uint64_t>("output-size");
-    configuration.SystemPolicyName = CopyString(parser.get<std::string>("policy"));
-    configuration.UserCommand      = CopyString(parser.rest()[0]);
+    
+    if (parser.rest().empty())
+    {
+        fprintf(stderr, "No command specified\n");
+        fprintf(stderr, "%s", parser.usage().c_str());
+        exit(1);
+    }
+    else
+    {
+        configuration.UserCommand = CopyString(parser.rest()[0]);
+    }
 
     return configuration;
 }

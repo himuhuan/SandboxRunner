@@ -1,6 +1,7 @@
 #include "SandboxChildProcess.h"
 #include "SandboxImpl.h"
 #include "../Logger.h"
+#include "SecurePolicy.h"
 #include <csignal>
 #include <sched.h>
 #include <sys/resource.h>
@@ -77,7 +78,17 @@ void RunSandboxProcess(const char *programPath, char *const *programArgs, const 
             CHILD_FATAL_ERROR("Failed to redirect error file", SANDBOX_STATUS_INTERNAL_ERROR);
     }
 
-    Logger::Info("Running the sandboxed process");
+    if (configuration->Policy != DEFAULT)
+        Logger::Info("Applying custom rules: {0}", configuration->Policy);
+
+    if (ApplyLinuxSecurePolicy(programPath, configuration))
+    {
+        Logger::Info("Applied policy to {0}, start running the sandboxed process", programPath);
+    }
+    else 
+    {
+        CHILD_FATAL_ERROR("Failed to apply policy", SANDBOX_STATUS_INTERNAL_ERROR);
+    }
 
     execve(programPath, programArgs, nullptr);
     CHILD_FATAL_ERROR("Failed to execute the user command", SANDBOX_STATUS_INTERNAL_ERROR);

@@ -1,11 +1,10 @@
-file(GLOB SAMPLES_SOURCE "*.cpp")
-
-add_custom_target(BUILD_TESTS)
-
-foreach (sample_source ${SAMPLES_SOURCE})
-    get_filename_component(sample_name ${sample_source} NAME_WE)
-    add_executable(${sample_name} ${sample_source})
-    add_dependencies(BUILD_TESTS ${sample_name})
-endforeach ()
-
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/TestData DESTINATION ${CMAKE_BINARY_DIR}/Tests)
+
+add_custom_target(
+	SAMPLES_TESTS
+	COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/sample_generator.py ${CMAKE_BINARY_DIR}/Tests/Samples ${CMAKE_CXX_COMPILER}
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+	COMMENT "Generating samples..."
+)
+
+add_dependencies(BUILD_ALL SAMPLES_TESTS)

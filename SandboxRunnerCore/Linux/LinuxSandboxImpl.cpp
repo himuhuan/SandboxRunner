@@ -109,19 +109,20 @@ int SandboxImpl::Run()
 
         if (_result.ExitCode != 0 || _result.Signal != 0)
         {
-            if (_result.Signal == SIGSEGV && _config->MaxMemory != UNLIMITED &&
-                _result.MemoryUsage > _config->MaxMemory)
+            if (_result.Signal == SIGSEGV && _config->MaxMemory != UNLIMITED
+                && _result.MemoryUsage > _config->MaxMemory)
                 _result.Status = SANDBOX_STATUS_MEMORY_LIMIT_EXCEEDED;
+            else if (_result.Signal == SIGKILL && _config->MaxRealTime != UNLIMITED
+                     && _result.RealTimeUsage >= _config->MaxRealTime)
+                _result.Status = SANDBOX_STATUS_REAL_TIME_LIMIT_EXCEEDED;
             else
-                _result.Status = SANDBOX_STATUS_RUNTIME_ERROR;
+                _result.Status = (_result.Signal == SIGSYS) ? SANDBOX_STATUS_ILLEGAL_OPERATION : SANDBOX_STATUS_RUNTIME_ERROR;
         }
 
-        if (_config->MaxMemory != UNLIMITED && _result.MemoryUsage > _config->MaxMemory)
+        if (_config->MaxMemory != UNLIMITED && _result.MemoryUsage >= _config->MaxMemory)
             _result.Status = SANDBOX_STATUS_MEMORY_LIMIT_EXCEEDED;
-        else if (_config->MaxCpuTime != UNLIMITED && _result.CpuTimeUsage > _config->MaxCpuTime)
+        else if (_config->MaxCpuTime != UNLIMITED && _result.CpuTimeUsage >= _config->MaxCpuTime)
             _result.Status = SANDBOX_STATUS_CPU_TIME_LIMIT_EXCEEDED;
-        else if (_config->MaxRealTime != UNLIMITED && _result.RealTimeUsage > _config->MaxRealTime)
-            _result.Status = SANDBOX_STATUS_REAL_TIME_LIMIT_EXCEEDED;
     }
     return 0;
 }
