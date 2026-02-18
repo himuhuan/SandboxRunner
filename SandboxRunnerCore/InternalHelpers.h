@@ -109,7 +109,6 @@ struct InternalConfig
     std::string TaskName;
     std::string UserCommand;
     std::string WorkingDirectory;
-    std::vector<std::string> EnvironmentVariables;
     std::string InputFile;
     std::string OutputFile;
     std::string ErrorFile;
@@ -129,9 +128,6 @@ struct InternalConfig
 
     // Parse command into arguments
     std::vector<std::string> ParseCommandArgs() const;
-
-    // Convert environment variables to char* const* for execve
-    std::vector<char *> GetEnvPointers() const;
 };
 
 } // namespace SandboxInternal

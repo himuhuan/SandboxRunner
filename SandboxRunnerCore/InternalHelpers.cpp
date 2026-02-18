@@ -16,18 +16,6 @@ InternalConfig InternalConfig::FromCConfig(const ::SandboxConfiguration *config)
     internal.UserCommand = config->UserCommand ? config->UserCommand : "";
     internal.WorkingDirectory = config->WorkingDirectory ? config->WorkingDirectory : "";
 
-    if (config->EnvironmentVariables && config->EnvironmentVariablesCount > 0)
-    {
-        internal.EnvironmentVariables.reserve(config->EnvironmentVariablesCount);
-        for (uint16_t i = 0; i < config->EnvironmentVariablesCount; ++i)
-        {
-            if (config->EnvironmentVariables[i])
-            {
-                internal.EnvironmentVariables.emplace_back(config->EnvironmentVariables[i]);
-            }
-        }
-    }
-
     internal.InputFile = config->InputFile ? config->InputFile : "";
     internal.OutputFile = config->OutputFile ? config->OutputFile : "";
     internal.ErrorFile = config->ErrorFile ? config->ErrorFile : "";
@@ -57,31 +45,6 @@ std::vector<std::string> InternalConfig::ParseCommandArgs() const
     }
 
     return args;
-}
-
-std::vector<char *> InternalConfig::GetEnvPointers() const
-{
-    std::vector<char *> envPtrs;
-
-    if (EnvironmentVariables.empty())
-    {
-        // Use system environment
-        for (char **env = environ; *env != nullptr; ++env)
-        {
-            envPtrs.push_back(*env);
-        }
-    }
-    else
-    {
-        // Use custom environment (const_cast is safe here as execve doesn't modify)
-        for (const auto &envVar : EnvironmentVariables)
-        {
-            envPtrs.push_back(const_cast<char *>(envVar.c_str()));
-        }
-    }
-
-    envPtrs.push_back(nullptr);
-    return envPtrs;
 }
 
 } // namespace SandboxInternal
