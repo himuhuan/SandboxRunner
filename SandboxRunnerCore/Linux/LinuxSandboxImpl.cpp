@@ -4,6 +4,7 @@
 #include "../Logger.h"
 
 #include "../SandboxUtils.h"
+#include "../InternalHelpers.h"
 #include "SandboxChildProcess.h"
 #include "SandboxMonitor.h"
 
@@ -30,18 +31,25 @@ int SandboxImpl::Run()
         return SANDBOX_STATUS_INTERNAL_ERROR;
     }*/
 
-    // In some cases, the user command may be modified, so we need to copy it to a new buffer
-    char userCommand[USER_COMMAND_LENGTH] = {};
-    strncpy(userCommand, _config->UserCommand, USER_COMMAND_LENGTH);
+    // Convert C configuration to internal modern C++ representation
+    auto internalConfig = SandboxInternal::InternalConfig::FromCConfig(_config);
 
-    char *args[MAX_ARGUMENTS];
-    int argc;
-    if ((argc = SplitString(userCommand, " ", args, MAX_ARGUMENTS)) == MAX_ARGUMENTS)
+    // Parse command into arguments using modern C++ string handling
+    auto cmdArgs = internalConfig.ParseCommandArgs();
+    if (cmdArgs.empty() || cmdArgs.size() >= MAX_ARGUMENTS)
     {
-        Logger::Error("Failed to split user command, too many arguments");
+        Logger::Error("Failed to parse user command: invalid argument count");
         return SANDBOX_STATUS_INTERNAL_ERROR;
     }
-    args[argc] = nullptr;
+
+    // Convert to char* array for execve
+    std::vector<char *> args;
+    args.reserve(cmdArgs.size() + 1);
+    for (auto &arg : cmdArgs)
+    {
+        args.push_back(const_cast<char *>(arg.c_str()));
+    }
+    args.push_back(nullptr);
 
     Logger::Info("Starting sandboxed process: \"{0}\"", _config->UserCommand);
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
@@ -55,22 +63,24 @@ int SandboxImpl::Run()
 
     if (sandboxPid == 0) /* Child Process */
     {
-        RunSandboxProcess(args[0], args, _config);
+        RunSandboxProcess(args[0], args.data(), _config);
     }
     else
     {
         /* Parent Process */
 
-        pthread_t monitorThreadId = 0;
+        SandboxInternal::ScopedThread monitorThread;
         SandboxMonitorConfiguration monitorConfig{.Timeout = _config->MaxRealTime, .Pid = sandboxPid};
 
         if (_config->MaxRealTime != UNLIMITED)
         {
-            if (StartSandboxMonitor(&monitorThreadId, &monitorConfig) != 0)
+            pthread_t threadId = 0;
+            if (StartSandboxMonitor(&threadId, &monitorConfig) != 0)
             {
                 Logger::Error("Failed to start monitor thread");
                 return SANDBOX_STATUS_INTERNAL_ERROR;
             }
+            monitorThread.reset(threadId);
         }
 
         int childStatus;
@@ -85,12 +95,7 @@ int SandboxImpl::Run()
         std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
         _result.RealTimeUsage = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-        /* May required cleanup */
-        if (monitorThreadId != 0)
-        {
-            pthread_cancel(monitorThreadId);
-            pthread_join(monitorThreadId, nullptr);
-        }
+        // ScopedThread destructor will automatically clean up the monitor thread
 
         /* terminated by a signal */
         if (WIFSIGNALED(childStatus))

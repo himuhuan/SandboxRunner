@@ -6,7 +6,9 @@ add_library(sandbox SHARED
         Linux/SecurePolicy.cpp
         Linux/SecurePolicy.h
         Linux/SandboxMonitor.cpp
-        Linux/SandboxMonitor.h)
+        Linux/SandboxMonitor.h
+        InternalHelpers.h
+        InternalHelpers.cpp)
 
 find_package(fmt REQUIRED CONFIG)
 find_package(Threads REQUIRED)
