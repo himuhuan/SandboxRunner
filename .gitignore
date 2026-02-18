@@ -4,7 +4,4 @@ out/
 *.dll
 *.pdb
 
-# No IDE files
-.vs/
-.idea/
-.vscode/
+agents.md
