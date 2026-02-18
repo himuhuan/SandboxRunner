@@ -9,7 +9,8 @@ int main() {
     ll t;
     cin >> t;
 
-    vector overflow(128 * 1024 * 1024, 0);
+    // 40M ints ~= 160MB: exceed soft limit(128MB) but stay under hard fallback(256MB).
+    vector overflow(40 * 1024 * 1024, 0);
     while (t-- > 0) {
         int n;
         cin >> n;

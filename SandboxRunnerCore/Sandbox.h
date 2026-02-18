@@ -36,7 +36,7 @@ extern "C"
         const char *TaskName;               // The name of the sandboxed process, cannot be NULL
         const char *UserCommand;            // The command to run the sandboxed process, cannot be NULL
         const char *WorkingDirectory;       // The working directory for the sandboxed process
-        const char *EnvironmentVariables;   // The environment variables for the sandboxed process
+        const char *const *EnvironmentVariables; // The environment variables for the sandboxed process
         uint16_t EnvironmentVariablesCount; // The count of environment variables
         const char *InputFile;  // Redirect the input file for the sandboxed process, NULL means no redirection
         const char *OutputFile; // Redirect the output file for the sandboxed process, NULL means no redirection

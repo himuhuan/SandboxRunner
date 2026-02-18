@@ -5,6 +5,9 @@
 #include <csignal>
 #include <sched.h>
 #include <sys/resource.h>
+#include <unistd.h>
+
+extern char **environ;
 
 bool SetResourceLimit(const int resource, rlim_t val)
 {
@@ -12,6 +15,26 @@ bool SetResourceLimit(const int resource, rlim_t val)
         return true;
     const rlimit limit{.rlim_cur = val, .rlim_max = val};
     return setrlimit(resource, &limit) == 0;
+}
+
+rlim_t GetEffectiveMaxMemoryToCrash(const SandboxConfiguration *configuration)
+{
+    if (configuration->MaxMemoryToCrash != 0
+        && (configuration->MaxMemory == UNLIMITED || configuration->MaxMemoryToCrash >= configuration->MaxMemory))
+        return configuration->MaxMemoryToCrash;
+
+    if (configuration->MaxMemory == UNLIMITED)
+        return UNLIMITED;
+
+    return configuration->MaxMemory * 2;
+}
+
+char *const *GetEnvironmentVariables(const SandboxConfiguration *configuration)
+{
+    if (configuration->EnvironmentVariables == nullptr || configuration->EnvironmentVariablesCount == 0)
+        return environ;
+
+    return const_cast<char *const *>(configuration->EnvironmentVariables);
 }
 
 #define CHILD_FATAL_ERROR(message, code)                                                                               \
@@ -33,8 +56,12 @@ void RunSandboxProcess(const char *programPath, char *const *programArgs, const 
 
     rlim_t cpuLimit = configuration->MaxCpuTime != 0 ? (configuration->MaxCpuTime + 1000) / 1000 : UNLIMITED;
 
+    if (configuration->WorkingDirectory && chdir(configuration->WorkingDirectory) != 0)
+        CHILD_FATAL_ERROR("Failed to switch working directory", SANDBOX_STATUS_INTERNAL_ERROR);
+
+    const rlim_t maxMemoryToCrash = GetEffectiveMaxMemoryToCrash(configuration);
     Logger::Debug("Applying job limits");
-    if (!SetResourceLimit(RLIMIT_AS, configuration->MaxMemoryToCrash)
+    if (!SetResourceLimit(RLIMIT_AS, maxMemoryToCrash)
         || !SetResourceLimit(RLIMIT_STACK, configuration->MaxStack) || !SetResourceLimit(RLIMIT_CPU, cpuLimit)
         || (configuration->MaxProcessCount >= 0 && !SetResourceLimit(RLIMIT_NPROC, configuration->MaxProcessCount))
         || !SetResourceLimit(RLIMIT_FSIZE, configuration->MaxOutputSize))
@@ -90,6 +117,6 @@ void RunSandboxProcess(const char *programPath, char *const *programArgs, const 
         CHILD_FATAL_ERROR("Failed to apply policy", SANDBOX_STATUS_INTERNAL_ERROR);
     }
 
-    execve(programPath, programArgs, nullptr);
+    execve(programPath, programArgs, GetEnvironmentVariables(configuration));
     CHILD_FATAL_ERROR("Failed to execute the user command", SANDBOX_STATUS_INTERNAL_ERROR);
 }

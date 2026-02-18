@@ -44,7 +44,7 @@ SandboxConfiguration GetSandboxConfiguration(int argc, char **argv)
     parser.add<uint64_t>("stack", 0, "Stack limit of the task", false, 0);
     parser.add<uint64_t>("cpu", 0, "CPU time limit of the task", false, 0);
     parser.add<uint64_t>("real", 0, "Real time limit of the task", false, 0);
-    parser.add<uint64_t>("process", 0, "Process count limit of the task", false, 0);
+    parser.add<int>("process", 0, "Process count limit of the task (-1 means unlimited)", false, -1);
     parser.add<uint64_t>("output-size", 0, "Output size limit of the task", false, 0);
     parser.add<std::string>("policy", 'p', "The policy of the task", false, "default",
                             cmdline::oneof<std::string>("default", "cxx"));

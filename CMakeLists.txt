@@ -11,9 +11,10 @@ endif ()
 
 project("SandboxRunner")
 
+enable_testing()
+
 add_custom_target(BUILD_ALL)
 
 add_subdirectory("SandboxRunner")
 add_subdirectory("SandboxRunnerCore")
 add_subdirectory("Tests")
-

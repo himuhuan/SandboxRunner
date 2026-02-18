@@ -32,7 +32,5 @@ bool IsSandboxConfigurationVaild(const SandboxConfiguration *config)
         return false;
     if (config->MaxMemory > MAX_MEMORY_FOR_SANDBOX_PROCESS)
         return false;
-    if (config->MaxMemoryToCrash != 0 && config->MaxMemoryToCrash < (config->MaxMemory << 1))
-        return false;
     return true;
 }
