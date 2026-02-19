@@ -7,6 +7,8 @@ add_library(sandbox SHARED
         Linux/SecurePolicy.h
         Linux/SandboxMonitor.cpp
         Linux/SandboxMonitor.h
+        Linux/ErrorHandler.h
+        Linux/ErrorHandler.cpp
         InternalHelpers.h
         InternalHelpers.cpp)
 

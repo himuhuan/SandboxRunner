@@ -2,6 +2,7 @@
 #include "SandboxImpl.h"
 #include "fmt/core.h"
 #include "../Logger.h"
+#include "ErrorHandler.h"
 
 #include "../SandboxUtils.h"
 #include "../InternalHelpers.h"
@@ -21,6 +22,10 @@ SandboxImpl::SandboxImpl(const SandboxConfiguration *config, SandboxResult &resu
 
 int SandboxImpl::Run()
 {
+    using SandboxInternal::ErrorContext;
+    using SandboxInternal::InternalError;
+    using SandboxInternal::HandleParentError;
+
     Logger::Initialize(_config->TaskName, _config->LogFile, Logger::LoggerLevel::Debug);
     Logger::Info("Start running sandboxed process");
 
@@ -38,8 +43,7 @@ int SandboxImpl::Run()
     auto cmdArgs = internalConfig.ParseCommandArgs();
     if (cmdArgs.empty() || cmdArgs.size() >= MAX_ARGUMENTS)
     {
-        Logger::Error("Failed to parse user command: invalid argument count");
-        return SANDBOX_STATUS_INTERNAL_ERROR;
+        return HandleParentError(ErrorContext(InternalError::InvalidCommandArgs, "Invalid argument count"));
     }
 
     // Convert to char* array for execve
@@ -57,8 +61,7 @@ int SandboxImpl::Run()
     pid_t sandboxPid = fork();
     if (sandboxPid < 0)
     {
-        Logger::Error("Failed to fork process");
-        exit(SANDBOX_STATUS_INTERNAL_ERROR);
+        return HandleParentError(ErrorContext(InternalError::ForkFailed, "Failed to fork process"));
     }
 
     if (sandboxPid == 0) /* Child Process */
@@ -77,8 +80,7 @@ int SandboxImpl::Run()
             pthread_t threadId = 0;
             if (StartSandboxMonitor(&threadId, &monitorConfig) != 0)
             {
-                Logger::Error("Failed to start monitor thread");
-                return SANDBOX_STATUS_INTERNAL_ERROR;
+                return HandleParentError(ErrorContext(InternalError::MonitorThreadStartFailed, "Failed to start monitor thread"));
             }
             monitorThread.reset(threadId);
         }
@@ -88,8 +90,7 @@ int SandboxImpl::Run()
         if (wait4(sandboxPid, &childStatus, 0, &usage) == -1)
         {
             kill(sandboxPid, SIGKILL);
-            Logger::Error("Failed to wait for child process");
-            return SANDBOX_STATUS_INTERNAL_ERROR;
+            return HandleParentError(ErrorContext(InternalError::WaitFailed, "Failed to wait for child process"));
         }
 
         std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
