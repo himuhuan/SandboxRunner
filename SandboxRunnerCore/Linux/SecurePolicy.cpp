@@ -1,6 +1,7 @@
 #include "SecurePolicy.h"
 
 #include "../Logger.h"
+#include "../InternalHelpers.h"
 
 #include <cassert>
 #include <seccomp.h>
@@ -58,77 +59,62 @@ bool ApplyCxxProgramPolicy(const char *programPath, const SandboxConfiguration *
 #endif
     };
 
-    scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_KILL);
-    if (ctx == nullptr)
+    SandboxInternal::SeccompContext ctx(SCMP_ACT_KILL);
+    if (!ctx.valid())
         return false;
 
-    bool success = true;
-    do
+    // Allow the list of syscalls
+    for (const auto syscall : kAllowList)
     {
-        // Allow the list of syscalls
-        for (const auto syscall : kAllowList)
-        {
-            if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, syscall, 0) != 0)
-            {
-                success = false;
-                break;
-            }
-        }
-        if (!success)
-            break;
-
-        // Only the program itself is allowed to be executed
-        if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(execve), 0,
-                             SCMP_A0(SCMP_CMP_EQ, (scmp_datum_t)(programPath))))
-        {
-            success = false;
-            break;
-        }
-
-        /* Always require IO? */
-        // ReSharper disable once CppDFAConstantConditions
-        if (allowIO)
-        {
-            if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(open), 0) != 0
-                || seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(openat), 0) != 0
-                || seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(dup), 0) != 0
-                || seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(dup2), 0) != 0
-                || seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(dup3), 0) != 0)
-            {
-                success = false;
-                break;
-            }
-        }
-        else
-        {
-            // ReSharper disable once CppDFAUnreachableCode
-            if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(open), 1,
-                                 SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_WRONLY | O_RDWR, 0)))
-            {
-                success = false;
-                break;
-            }
-            if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(openat), 1,
-                                 SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_WRONLY | O_RDWR, 0)))
-            {
-                success = false;
-                break;
-            }
-        }
-
-    } while (false);
-
-    if (success)
-    {
-        Logger::Info("Loading seccomp filter");
-        if (seccomp_load(ctx) != 0)
+        if (seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, syscall, 0) != 0)
         {
             return false;
         }
     }
 
-    seccomp_release(ctx);
-    return success;
+    // Only the program itself is allowed to be executed
+    if (seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(execve), 0,
+                         SCMP_A0(SCMP_CMP_EQ, (scmp_datum_t)(programPath))))
+    {
+        return false;
+    }
+
+    /* Always require IO? */
+    // ReSharper disable once CppDFAConstantConditions
+    if (allowIO)
+    {
+        if (seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(open), 0) != 0
+            || seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(openat), 0) != 0
+            || seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(dup), 0) != 0
+            || seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(dup2), 0) != 0
+            || seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(dup3), 0) != 0)
+        {
+            return false;
+        }
+    }
+    else
+    {
+        // ReSharper disable once CppDFAUnreachableCode
+        if (seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(open), 1,
+                             SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_WRONLY | O_RDWR, 0)))
+        {
+            return false;
+        }
+        if (seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(openat), 1,
+                             SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_WRONLY | O_RDWR, 0)))
+        {
+            return false;
+        }
+    }
+
+    Logger::Info("Loading seccomp filter");
+    if (seccomp_load(ctx.get()) != 0)
+    {
+        return false;
+    }
+
+    // SeccompContext destructor will automatically release the context
+    return true;
 }
 
 } // namespace

@@ -1,13 +1,8 @@
 #include "Logger.h"
 
-Logger *Logger::_instance = nullptr;
+std::unique_ptr<Logger> Logger::_instance = nullptr;
 
-Logger::~Logger()
-{
-    Release();
-}
-
-Logger::Logger(const char *name, LoggerLevel level) 
-    : _logFile(nullptr), _loggerName(name), Level(level)
+Logger::Logger(const char *name, LoggerLevel level, FILE *logFile)
+    : Level(level), _loggerName(name), _logFile(logFile)
 {
 }

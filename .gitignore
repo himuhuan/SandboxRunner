@@ -5,3 +5,7 @@ out/
 *.pdb
 
 agents.md
+
+# .NET build artifacts
+**/bin/
+**/obj/

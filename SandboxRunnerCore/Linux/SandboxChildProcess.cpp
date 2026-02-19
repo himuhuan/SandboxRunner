@@ -1,7 +1,9 @@
 #include "SandboxChildProcess.h"
 #include "SandboxImpl.h"
 #include "../Logger.h"
+#include "../InternalHelpers.h"
 #include "SecurePolicy.h"
+#include "ErrorHandler.h"
 #include <csignal>
 #include <sched.h>
 #include <sys/resource.h>
@@ -37,27 +39,21 @@ char *const *GetEnvironmentVariables(const SandboxConfiguration *configuration)
     return const_cast<char *const *>(configuration->EnvironmentVariables);
 }
 
-#define CHILD_FATAL_ERROR(message, code)                                                                               \
-    {                                                                                                                  \
-        Logger::Error("(CHILD {0}): {1}, error: {2}", (int)getpid(), message, strerror(errno));                        \
-        if (inputStream != nullptr)                                                                                    \
-            fclose(inputStream);                                                                                       \
-        if (outputStream != nullptr)                                                                                   \
-            fclose(outputStream);                                                                                      \
-        if (errorStream != nullptr && outputStream != errorStream)                                                     \
-            fclose(errorStream);                                                                                       \
-        raise(SIGUSR1);                                                                                                \
-        exit(code);                                                                                                    \
-    }
-
 void RunSandboxProcess(const char *programPath, char *const *programArgs, const SandboxConfiguration *configuration)
 {
-    FILE *inputStream = nullptr, *outputStream = nullptr, *errorStream = nullptr;
+    using SandboxInternal::UniqueFile;
+    using SandboxInternal::ErrorContext;
+    using SandboxInternal::InternalError;
+    using SandboxInternal::HandleChildError;
+
+    UniqueFile inputStream;
+    UniqueFile outputStream;
+    UniqueFile errorStream;
 
     rlim_t cpuLimit = configuration->MaxCpuTime != 0 ? (configuration->MaxCpuTime + 1000) / 1000 : UNLIMITED;
 
     if (configuration->WorkingDirectory && chdir(configuration->WorkingDirectory) != 0)
-        CHILD_FATAL_ERROR("Failed to switch working directory", SANDBOX_STATUS_INTERNAL_ERROR);
+        HandleChildError(ErrorContext(InternalError::InvalidWorkingDirectory, "Failed to switch working directory"));
 
     const rlim_t maxMemoryToCrash = GetEffectiveMaxMemoryToCrash(configuration);
     Logger::Debug("Applying job limits");
@@ -66,43 +62,45 @@ void RunSandboxProcess(const char *programPath, char *const *programArgs, const 
         || (configuration->MaxProcessCount >= 0 && !SetResourceLimit(RLIMIT_NPROC, configuration->MaxProcessCount))
         || !SetResourceLimit(RLIMIT_FSIZE, configuration->MaxOutputSize))
     {
-        CHILD_FATAL_ERROR("Failed to apply job limits", SANDBOX_STATUS_INTERNAL_ERROR);
+        HandleChildError(ErrorContext(InternalError::ResourceLimitFailed, "Failed to apply job limits"));
     }
 
     if (configuration->InputFile)
     {
-        inputStream = fopen(configuration->InputFile, "r");
-        if (inputStream == nullptr)
-            CHILD_FATAL_ERROR("Failed to open input file", SANDBOX_STATUS_INTERNAL_ERROR);
-        if (dup2(fileno(inputStream), fileno(stdin)) == -1)
-            CHILD_FATAL_ERROR("Failed to redirect input file", SANDBOX_STATUS_INTERNAL_ERROR);
+        inputStream.reset(fopen(configuration->InputFile, "r"));
+        if (!inputStream)
+            HandleChildError(ErrorContext(InternalError::InputFileOpenFailed, "Failed to open input file"));
+        if (dup2(fileno(inputStream.get()), fileno(stdin)) == -1)
+            HandleChildError(ErrorContext(InternalError::FileRedirectFailed, "Failed to redirect input file"));
     }
 
     if (configuration->OutputFile)
     {
-        outputStream = fopen(configuration->OutputFile, "w");
-        if (outputStream == nullptr)
-            CHILD_FATAL_ERROR("Failed to open output file", SANDBOX_STATUS_INTERNAL_ERROR);
-        if (dup2(fileno(outputStream), fileno(stdout)) == -1)
-            CHILD_FATAL_ERROR("Failed to redirect output file", SANDBOX_STATUS_INTERNAL_ERROR);
+        outputStream.reset(fopen(configuration->OutputFile, "w"));
+        if (!outputStream)
+            HandleChildError(ErrorContext(InternalError::OutputFileOpenFailed, "Failed to open output file"));
+        if (dup2(fileno(outputStream.get()), fileno(stdout)) == -1)
+            HandleChildError(ErrorContext(InternalError::FileRedirectFailed, "Failed to redirect output file"));
     }
 
     if (configuration->ErrorFile)
     {
-        if (outputStream != nullptr && strcmp(configuration->OutputFile, configuration->ErrorFile) == 0)
+        if (outputStream && strcmp(configuration->OutputFile, configuration->ErrorFile) == 0)
         {
             Logger::Info("Same path for output and error file");
-            errorStream = outputStream;
+            // Share the same FILE* - no need to open again
+            if (dup2(fileno(outputStream.get()), fileno(stderr)) == -1)
+                HandleChildError(ErrorContext(InternalError::FileRedirectFailed, "Failed to redirect error file"));
         }
         else
         {
-            errorStream = fopen(configuration->ErrorFile, "w");
-            if (errorStream == nullptr)
-                CHILD_FATAL_ERROR("Failed to open error file", SANDBOX_STATUS_INTERNAL_ERROR);
-        }
+            errorStream.reset(fopen(configuration->ErrorFile, "w"));
+            if (!errorStream)
+                HandleChildError(ErrorContext(InternalError::ErrorFileOpenFailed, "Failed to open error file"));
 
-        if (dup2(fileno(errorStream), fileno(stderr)) == -1)
-            CHILD_FATAL_ERROR("Failed to redirect error file", SANDBOX_STATUS_INTERNAL_ERROR);
+            if (dup2(fileno(errorStream.get()), fileno(stderr)) == -1)
+                HandleChildError(ErrorContext(InternalError::FileRedirectFailed, "Failed to redirect error file"));
+        }
     }
 
     if (configuration->Policy != DEFAULT)
@@ -112,11 +110,11 @@ void RunSandboxProcess(const char *programPath, char *const *programArgs, const 
     {
         Logger::Info("Applied policy to {0}, start running the sandboxed process", programPath);
     }
-    else 
+    else
     {
-        CHILD_FATAL_ERROR("Failed to apply policy", SANDBOX_STATUS_INTERNAL_ERROR);
+        HandleChildError(ErrorContext(InternalError::PolicyApplicationFailed, "Failed to apply policy"));
     }
 
     execve(programPath, programArgs, GetEnvironmentVariables(configuration));
-    CHILD_FATAL_ERROR("Failed to execute the user command", SANDBOX_STATUS_INTERNAL_ERROR);
+    HandleChildError(ErrorContext(InternalError::ExecFailed, "Failed to execute the user command"));
 }

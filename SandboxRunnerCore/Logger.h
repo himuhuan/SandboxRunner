@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <string>
+#include <memory>
 
 #include <fmt/std.h>
 #include <fmt/chrono.h>
@@ -11,6 +12,8 @@
 #include <sys/file.h>
 #include <unistd.h>
 #endif
+
+#include "InternalHelpers.h"
 
 class Logger
 {
@@ -22,12 +25,6 @@ public:
         Warning,
         Error
     };
-
-#ifdef DEBUG
-    const LoggerLevel Level = LoggerLevel::Debug;
-#else
-    const LoggerLevel Level = LoggerLevel::Info;
-#endif
 
     template <typename... Arg> static void Debug(fmt::format_string<Arg...> message, Arg &&...args)
     {
@@ -53,16 +50,14 @@ public:
     {
         if (_instance == nullptr)
             throw std::runtime_error("Logger not initialized");
-        return _instance;
+        return _instance.get();
     }
 
     static void Release()
     {
         if (_instance != nullptr)
         {
-            fclose(_instance->_logFile);
-            delete _instance;
-            _instance = nullptr;
+            _instance.reset();
         }
     }
 
@@ -70,23 +65,31 @@ public:
     {
         if (_instance == nullptr)
         {
-            _instance = new (std::nothrow) Logger(logName, level);
+            FILE *logFile = (logFileName == nullptr) ? stderr : fopen(logFileName, "a");
+            if (logFile == nullptr)
+                return false;
+
+            _instance = std::unique_ptr<Logger>(new (std::nothrow) Logger(logName, level, logFile));
             if (_instance == nullptr)
+            {
+                if (logFile != stderr)
+                    fclose(logFile);
                 return false;
-            _instance->_logFile = (logFileName == nullptr) ? stderr : fopen(logFileName, "a");
-            if (_instance->_logFile == nullptr)
-                return false;
+            }
         }
         return true;
     }
 
 private:
+    const LoggerLevel Level;
     const char *_loggerName;
-    FILE *_logFile;
-    static Logger *_instance;
+    SandboxInternal::UniqueFile _logFile;
+    static std::unique_ptr<Logger> _instance;
 
-    Logger(const char *name, LoggerLevel level);
-    ~Logger();
+    Logger(const char *name, LoggerLevel level, FILE *logFile);
+
+public:
+    ~Logger() = default;
 
     template <typename... Arg> static void Log(LoggerLevel level, fmt::format_string<Arg...> message, Arg &&...args)
     {
@@ -113,13 +116,13 @@ private:
         std::string logPrefix = fmt::format("[{0:%Y-%m-%d %H:%M:%S}][{1}]{2} ", fmt::localtime(currentTime),
                                             _instance->_loggerName, levelStr);
         std::string logMessage = fmt::format(message, std::forward<Arg>(args)...);
-        if (GetInstance()->_logFile == nullptr)
+        if (!GetInstance()->_logFile)
         {
             fmt::print(stderr, "{0}{1}\n", logPrefix, logMessage);
             return;
         }
 #if __linux
-        int logFd = fileno(GetInstance()->_logFile);
+        int logFd = fileno(GetInstance()->_logFile.get());
         std::string logStr = logPrefix + logMessage + "\n";
         if (flock(logFd, LOCK_EX) == 0)
         {

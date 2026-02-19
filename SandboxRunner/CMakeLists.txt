@@ -1,12 +1,9 @@
-﻿add_executable (SandboxRunner "SandboxRunner.cpp" "SandboxRunner.h" "../ThirdParty/cmdline.h")
+add_executable (SandboxRunner "SandboxRunner.cpp" "SandboxRunner.h" "../ThirdParty/cmdline.h")
 
-if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET SandboxRunner PROPERTY CXX_STANDARD 20)
-endif()
-
-include_directories(../ThirdParty)
+target_include_directories(SandboxRunner PRIVATE ../ThirdParty)
 
 find_package(stduuid CONFIG REQUIRED)
 target_link_libraries(SandboxRunner PRIVATE sandbox stduuid)
+sandboxrunner_configure_target(SandboxRunner)
 
 add_dependencies(BUILD_ALL sandbox)
