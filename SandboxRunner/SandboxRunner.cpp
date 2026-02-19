@@ -1,4 +1,4 @@
-﻿#include "SandboxRunner.h"
+#include "SandboxRunner.h"
 #include "../SandboxRunnerCore/Sandbox.h"
 #include "cmdline.h"
 #include "stduuid/uuid.h"
@@ -59,7 +59,12 @@ SandboxConfiguration GetSandboxConfiguration(int argc, char **argv)
     configuration.TaskName = CopyString(parser.get<std::string>("name"));
     if (configuration.TaskName == nullptr)
     {
-        std::string randomName = to_string(uuids::uuid_system_generator{}());
+        std::random_device rd;
+        auto seed_data = std::array<int, std::mt19937::state_size>{};
+        std::generate(std::begin(seed_data), std::end(seed_data), std::ref(rd));
+        std::seed_seq seq(std::begin(seed_data), std::end(seed_data));
+        std::mt19937 generator(seq);
+        std::string randomName = uuids::to_string(uuids::uuid_random_generator{generator}());
         configuration.TaskName = CopyString(randomName);
     }
     

@@ -113,7 +113,7 @@ public:
         }
 
         std::time_t currentTime = std::time(nullptr);
-        std::string logPrefix = fmt::format("[{0:%Y-%m-%d %H:%M:%S}][{1}]{2} ", fmt::localtime(currentTime),
+        std::string logPrefix = fmt::format("[{0:%Y-%m-%d %H:%M:%S}][{1}]{2} ", *std::localtime(&currentTime),
                                             _instance->_loggerName, levelStr);
         std::string logMessage = fmt::format(message, std::forward<Arg>(args)...);
         if (!GetInstance()->_logFile)
