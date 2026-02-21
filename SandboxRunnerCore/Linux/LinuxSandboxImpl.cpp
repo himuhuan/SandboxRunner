@@ -4,7 +4,7 @@
 #include "../Logger.h"
 #include "ErrorHandler.h"
 
-#include "../SandboxUtils.h"
+#include "../SandboxUtils.h" // IWYU pragma: keep
 #include "../InternalHelpers.h"
 #include "SandboxChildProcess.h"
 #include "SandboxMonitor.h"
@@ -13,7 +13,7 @@
 #include <sys/resource.h>
 
 constexpr int MAX_ARGUMENTS       = 128;
-constexpr int USER_COMMAND_LENGTH = 1024;
+[[maybe_unused]] constexpr int USER_COMMAND_LENGTH = 1024;
 
 SandboxImpl::SandboxImpl(const SandboxConfiguration *config, SandboxResult &result) : _config(config), _result(result)
 {

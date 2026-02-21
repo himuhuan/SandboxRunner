@@ -1,4 +1,4 @@
-#include "SandboxTest.h"
+#include "SandboxTest.h" // IWYU pragma: keep
 
 #include <cstdint>
 #include <cstddef>
