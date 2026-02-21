@@ -16,12 +16,12 @@ constexpr int SANDBOX_VERSION = 0x010302;
 /* Public APIs */
 extern "C"
 {
-    constexpr int MAX_ENVIRONMENT_VARIABLES = 256;
+    [[maybe_unused]] constexpr int MAX_ENVIRONMENT_VARIABLES = 256;
 
     /**
      * @brief The maximum memory for the sandboxed process, byte
      */
-    constexpr uint64_t MAX_MEMORY_FOR_SANDBOX_PROCESS = 0x7FFFFFFF;
+    [[maybe_unused]]  constexpr uint64_t MAX_MEMORY_FOR_SANDBOX_PROCESS = 0x7FFFFFFF;
 
     enum SandboxSecurePolicy
     {
