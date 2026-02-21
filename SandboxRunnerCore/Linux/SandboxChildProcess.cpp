@@ -2,6 +2,7 @@
 #include "SandboxImpl.h"
 #include "../Logger.h"
 #include "../InternalHelpers.h"
+#include "../Policy/ResourceConfig.h"
 #include "SecurePolicy.h"
 #include "ErrorHandler.h"
 #include <csignal>
@@ -17,18 +18,6 @@ bool SetResourceLimit(const int resource, rlim_t val)
         return true;
     const rlimit limit{.rlim_cur = val, .rlim_max = val};
     return setrlimit(resource, &limit) == 0;
-}
-
-rlim_t GetEffectiveMaxMemoryToCrash(const SandboxConfiguration *configuration)
-{
-    if (configuration->MaxMemoryToCrash != 0
-        && (configuration->MaxMemory == UNLIMITED || configuration->MaxMemoryToCrash >= configuration->MaxMemory))
-        return configuration->MaxMemoryToCrash;
-
-    if (configuration->MaxMemory == UNLIMITED)
-        return UNLIMITED;
-
-    return configuration->MaxMemory * 2;
 }
 
 char *const *GetEnvironmentVariables(const SandboxConfiguration *configuration)
@@ -50,17 +39,20 @@ void RunSandboxProcess(const char *programPath, char *const *programArgs, const 
     UniqueFile outputStream;
     UniqueFile errorStream;
 
-    rlim_t cpuLimit = configuration->MaxCpuTime != 0 ? (configuration->MaxCpuTime + 1000) / 1000 : UNLIMITED;
+    const auto resourceConfig = SandboxPolicyEngine::ResourceConfig::FromCConfig(*configuration);
+    const auto cpuLimit = static_cast<rlim_t>(resourceConfig.GetEffectiveCpuLimitSeconds());
 
     if (configuration->WorkingDirectory && chdir(configuration->WorkingDirectory) != 0)
         HandleChildError(ErrorContext(InternalError::InvalidWorkingDirectory, "Failed to switch working directory"));
 
-    const rlim_t maxMemoryToCrash = GetEffectiveMaxMemoryToCrash(configuration);
+    const auto maxMemoryToCrash = static_cast<rlim_t>(resourceConfig.GetEffectiveMaxMemoryToCrash());
     Logger::Debug("Applying job limits");
     if (!SetResourceLimit(RLIMIT_AS, maxMemoryToCrash)
-        || !SetResourceLimit(RLIMIT_STACK, configuration->MaxStack) || !SetResourceLimit(RLIMIT_CPU, cpuLimit)
-        || (configuration->MaxProcessCount >= 0 && !SetResourceLimit(RLIMIT_NPROC, configuration->MaxProcessCount))
-        || !SetResourceLimit(RLIMIT_FSIZE, configuration->MaxOutputSize))
+        || !SetResourceLimit(RLIMIT_STACK, static_cast<rlim_t>(resourceConfig.MaxStack))
+        || !SetResourceLimit(RLIMIT_CPU, cpuLimit)
+        || (resourceConfig.MaxProcessCount >= 0
+            && !SetResourceLimit(RLIMIT_NPROC, static_cast<rlim_t>(resourceConfig.MaxProcessCount)))
+        || !SetResourceLimit(RLIMIT_FSIZE, static_cast<rlim_t>(resourceConfig.MaxOutputSize)))
     {
         HandleChildError(ErrorContext(InternalError::ResourceLimitFailed, "Failed to apply job limits"));
     }

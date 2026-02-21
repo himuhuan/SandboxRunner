@@ -10,7 +10,12 @@ add_library(sandbox SHARED
         Linux/ErrorHandler.h
         Linux/ErrorHandler.cpp
         InternalHelpers.h
-        InternalHelpers.cpp)
+        InternalHelpers.cpp
+        Policy/SandboxPolicy.h
+        Policy/PolicyRegistry.h
+        Policy/PolicyRegistry.cpp
+        Policy/ResourceConfig.h
+        Policy/ResourceConfig.cpp)
 
 find_package(fmt REQUIRED CONFIG)
 find_package(Threads REQUIRED)

@@ -1,6 +1,11 @@
 add_subdirectory("Samples")
 
-add_executable(SandboxTest SandboxTest.cpp SandboxTest.h AbiCompatibilityTest.cpp)
+add_executable(SandboxTest
+        SandboxTest.cpp
+        SandboxTest.h
+        AbiCompatibilityTest.cpp
+        PolicyRegistryTest.cpp
+        ResourceConfigTest.cpp)
 
 enable_testing()
 

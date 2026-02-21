@@ -1,4 +1,5 @@
 #include "Linux/SandboxImpl.h"
+#include "Policy/ResourceConfig.h"
 
 Sandbox::CreateSandboxResult Sandbox::Create(const SandboxConfiguration *config, SandboxResult &result)
 {
@@ -26,11 +27,5 @@ int StartSandbox(const SandboxConfiguration *config, SandboxResult *result)
 
 bool IsSandboxConfigurationVaild(const SandboxConfiguration *config)
 {
-    if (config == nullptr || config->TaskName == nullptr || config->UserCommand == nullptr)
-        return false;
-    if (config->Policy < 0 || config->Policy >= MAX_POLICY)
-        return false;
-    if (config->MaxMemory > MAX_MEMORY_FOR_SANDBOX_PROCESS)
-        return false;
-    return true;
+    return SandboxPolicyEngine::ValidateSandboxConfiguration(config).IsValid;
 }

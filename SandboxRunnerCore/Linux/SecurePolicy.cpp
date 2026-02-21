@@ -2,109 +2,102 @@
 
 #include "../Logger.h"
 #include "../InternalHelpers.h"
+#include "../Policy/PolicyRegistry.h"
 
-#include <cassert>
-#include <seccomp.h>
-#include <algorithm>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <cstdint>
 #include <fcntl.h>
+#include <seccomp.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 namespace
 {
 
-// ReSharper disable once CppDFAConstantParameter
-bool ApplyCxxProgramPolicy(const char *programPath, const SandboxConfiguration *config, bool allowIO)
+bool AllowPolicySyscalls(scmp_filter_ctx ctx, const SandboxPolicyEngine::SandboxPolicy &policy)
 {
-    assert(config->Policy == CXX_PROGRAM);
-
-    static constexpr int kAllowList[] = {
-        SCMP_SYS(access),
-        SCMP_SYS(arch_prctl),
-        SCMP_SYS(brk),
-        SCMP_SYS(clock_gettime),
-        SCMP_SYS(close),
-        SCMP_SYS(exit_group),
-        SCMP_SYS(faccessat),
-        SCMP_SYS(fstat),
-        SCMP_SYS(futex),
-        SCMP_SYS(flock),
-        SCMP_SYS(getpid),
-        SCMP_SYS(getrandom),
-        SCMP_SYS(lseek),
-        SCMP_SYS(mmap),
-        SCMP_SYS(mprotect),
-        SCMP_SYS(munmap),
-        SCMP_SYS(newfstatat),
-        SCMP_SYS(pread64),
-        SCMP_SYS(prlimit64),
-        SCMP_SYS(prctl),
-        SCMP_SYS(pipe2),
-        SCMP_SYS(read),
-        SCMP_SYS(readlink),
-        SCMP_SYS(readv),
-        SCMP_SYS(rseq),
-        SCMP_SYS(set_robust_list),
-        SCMP_SYS(set_tid_address),
-        SCMP_SYS(write),
-        SCMP_SYS(writev),
-        SCMP_SYS(seccomp),
-        SCMP_SYS(ioctl),
-        SCMP_SYS(set_tid_address),
-        SCMP_SYS(rt_sigprocmask),
-
-    // whitelist for debugging & testing
-#if DEBUG
-        SCMP_SYS(clock_nanosleep),
-#endif
-    };
-
-    SandboxInternal::SeccompContext ctx(SCMP_ACT_KILL);
-    if (!ctx.valid())
-        return false;
-
-    // Allow the list of syscalls
-    for (const auto syscall : kAllowList)
+    for (const auto syscall : policy.AllowedSyscalls)
     {
-        if (seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, syscall, 0) != 0)
+        if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, syscall, 0) != 0)
         {
             return false;
         }
     }
 
-    // Only the program itself is allowed to be executed
-    if (seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(execve), 0,
-                         SCMP_A0(SCMP_CMP_EQ, (scmp_datum_t)(programPath))))
+    return true;
+}
+
+bool AllowExecveRule(scmp_filter_ctx ctx, const char *programPath, const SandboxPolicyEngine::SandboxPolicy &policy)
+{
+    if (policy.RestrictExecveToProgramPath)
+    {
+        // Keep legacy behavior for stage-1: preserve old seccomp rule shape.
+        if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(execve), 0,
+                             SCMP_A0(SCMP_CMP_EQ, static_cast<scmp_datum_t>(reinterpret_cast<uintptr_t>(programPath)))))
+        {
+            return false;
+        }
+        return true;
+    }
+
+    if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(execve), 0) != 0)
     {
         return false;
     }
 
-    /* Always require IO? */
-    // ReSharper disable once CppDFAConstantConditions
-    if (allowIO)
+    return true;
+}
+
+bool AllowIoRules(scmp_filter_ctx ctx, const SandboxPolicyEngine::SandboxPolicy &policy)
+{
+    if (policy.AllowIO)
     {
-        if (seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(open), 0) != 0
-            || seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(openat), 0) != 0
-            || seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(dup), 0) != 0
-            || seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(dup2), 0) != 0
-            || seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(dup3), 0) != 0)
+        if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(open), 0) != 0
+            || seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(openat), 0) != 0
+            || seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(dup), 0) != 0
+            || seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(dup2), 0) != 0
+            || seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(dup3), 0) != 0)
         {
             return false;
         }
     }
     else
     {
-        // ReSharper disable once CppDFAUnreachableCode
-        if (seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(open), 1,
+        if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(open), 1,
                              SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_WRONLY | O_RDWR, 0)))
         {
             return false;
         }
-        if (seccomp_rule_add(ctx.get(), SCMP_ACT_ALLOW, SCMP_SYS(openat), 1,
+        if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(openat), 1,
                              SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_WRONLY | O_RDWR, 0)))
         {
             return false;
         }
+    }
+
+    return true;
+}
+
+bool ApplyPolicy(const char *programPath, const SandboxPolicyEngine::SandboxPolicy &policy)
+{
+    SandboxInternal::SeccompContext ctx(SCMP_ACT_KILL);
+    if (!ctx.valid())
+    {
+        return false;
+    }
+
+    if (!AllowPolicySyscalls(ctx.get(), policy))
+    {
+        return false;
+    }
+
+    if (!AllowExecveRule(ctx.get(), programPath, policy))
+    {
+        return false;
+    }
+
+    if (!AllowIoRules(ctx.get(), policy))
+    {
+        return false;
     }
 
     Logger::Info("Loading seccomp filter");
@@ -121,13 +114,16 @@ bool ApplyCxxProgramPolicy(const char *programPath, const SandboxConfiguration *
 
 bool ApplyLinuxSecurePolicy(const char *programPath, const SandboxConfiguration *config)
 {
-    switch (config->Policy)
+    const auto *policy = SandboxPolicyEngine::TryResolvePolicy(config->Policy);
+    if (policy == nullptr)
     {
-    case CXX_PROGRAM:
-        return ApplyCxxProgramPolicy(programPath, config, true);
-    case DEFAULT:
-        return true;
-    default:
-        [[unlikely]] return false;
+        return false;
     }
+
+    if (policy->PolicyId == DEFAULT)
+    {
+        return true;
+    }
+
+    return ApplyPolicy(programPath, *policy);
 }
