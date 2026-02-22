@@ -47,6 +47,9 @@ TEST(PolicyRegistryTest, CxxProgramPolicyContainsCriticalSyscalls)
     EXPECT_TRUE(ContainsSyscall(policy->AllowedSyscalls, SCMP_SYS(seccomp)));
     EXPECT_TRUE(ContainsSyscall(policy->AllowedSyscalls, SCMP_SYS(prlimit64)));
     EXPECT_TRUE(ContainsSyscall(policy->AllowedSyscalls, SCMP_SYS(fcntl)));
+    EXPECT_TRUE(ContainsSyscall(policy->AllowedSyscalls, SCMP_SYS(madvise)));
+    EXPECT_TRUE(ContainsSyscall(policy->AllowedSyscalls, SCMP_SYS(sigaltstack)));
+    EXPECT_TRUE(ContainsSyscall(policy->AllowedSyscalls, SCMP_SYS(gettid)));
 }
 
 TEST(PolicyRegistryTest, CxxProgramPolicyMatchesLegacyAllowList)
@@ -68,8 +71,10 @@ TEST(PolicyRegistryTest, CxxProgramPolicyMatchesLegacyAllowList)
         SCMP_SYS(futex),
         SCMP_SYS(flock),
         SCMP_SYS(getpid),
+        SCMP_SYS(gettid),
         SCMP_SYS(getrandom),
         SCMP_SYS(lseek),
+        SCMP_SYS(madvise),
         SCMP_SYS(mmap),
         SCMP_SYS(mprotect),
         SCMP_SYS(munmap),
@@ -82,7 +87,9 @@ TEST(PolicyRegistryTest, CxxProgramPolicyMatchesLegacyAllowList)
         SCMP_SYS(readlink),
         SCMP_SYS(readlinkat),
         SCMP_SYS(readv),
+        SCMP_SYS(rt_sigaction),
         SCMP_SYS(rseq),
+        SCMP_SYS(sigaltstack),
         SCMP_SYS(set_robust_list),
         SCMP_SYS(set_tid_address),
         SCMP_SYS(write),
