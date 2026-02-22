@@ -1,23 +1,20 @@
 #pragma once
 
-#include <cstdio>
-#include <string>
 #include <memory>
+#include <mutex>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
 
+#include <fmt/format.h>
 #include <fmt/std.h>
-#include <fmt/chrono.h>
-
-#if __linux__
-/* Linux fork require lock logger file */
-#include <sys/file.h>
-#include <unistd.h>
-#endif
-
-#include "InternalHelpers.h"
+#include <spdlog/spdlog.h>
 
 class Logger
 {
 public:
+    // Keep the existing logging entrypoints while delegating sink/formatting to spdlog.
     enum class LoggerLevel
     {
         Debug,
@@ -48,92 +45,62 @@ public:
 
     static Logger *GetInstance()
     {
+        std::lock_guard<std::mutex> lock(_instanceMutex);
         if (_instance == nullptr)
             throw std::runtime_error("Logger not initialized");
         return _instance.get();
     }
 
-    static void Release()
-    {
-        if (_instance != nullptr)
-        {
-            _instance.reset();
-        }
-    }
-
-    static bool Initialize(const char *logName, const char *logFileName, LoggerLevel level)
-    {
-        if (_instance == nullptr)
-        {
-            FILE *logFile = (logFileName == nullptr) ? stderr : fopen(logFileName, "a");
-            if (logFile == nullptr)
-                return false;
-
-            _instance = std::unique_ptr<Logger>(new (std::nothrow) Logger(logName, level, logFile));
-            if (_instance == nullptr)
-            {
-                if (logFile != stderr)
-                    fclose(logFile);
-                return false;
-            }
-        }
-        return true;
-    }
+    static void Release();
+    static bool Initialize(const char *logName, const char *logFileName, LoggerLevel level);
 
 private:
-    const LoggerLevel Level;
-    const char *_loggerName;
-    SandboxInternal::UniqueFile _logFile;
+    std::shared_ptr<spdlog::logger> _logger;
     static std::unique_ptr<Logger> _instance;
+    static std::mutex _instanceMutex;
 
-    Logger(const char *name, LoggerLevel level, FILE *logFile);
+    explicit Logger(std::shared_ptr<spdlog::logger> logger);
+    static spdlog::level::level_enum ToSpdlogLevel(LoggerLevel level);
+    static const char *ToLevelString(LoggerLevel level);
+    static void FallbackWrite(LoggerLevel level, std::string_view message);
 
 public:
     ~Logger() = default;
 
     template <typename... Arg> static void Log(LoggerLevel level, fmt::format_string<Arg...> message, Arg &&...args)
     {
-        if (_instance->Level >= level)
-            return;
-        const char *levelStr = nullptr;
-        switch (level)
+        std::string logMessage;
+        try
         {
-        case LoggerLevel::Debug:
-            levelStr = "[DEBUG]";
-            break;
-        case LoggerLevel::Info:
-            levelStr = "[INFO]";
-            break;
-        case LoggerLevel::Warning:
-            levelStr = "[WARNING]";
-            break;
-        case LoggerLevel::Error:
-            levelStr = "[ERROR]";
-            break;
+            logMessage = fmt::format(message, std::forward<Arg>(args)...);
+        }
+        catch (const std::exception &ex)
+        {
+            FallbackWrite(LoggerLevel::Error, fmt::format("Log format failed: {}", ex.what()));
+            return;
         }
 
-        std::time_t currentTime = std::time(nullptr);
-        std::string logPrefix = fmt::format("[{0:%Y-%m-%d %H:%M:%S}][{1}]{2} ", *std::localtime(&currentTime),
-                                            _instance->_loggerName, levelStr);
-        std::string logMessage = fmt::format(message, std::forward<Arg>(args)...);
-        if (!GetInstance()->_logFile)
+        std::shared_ptr<spdlog::logger> logger;
         {
-            fmt::print(stderr, "{0}{1}\n", logPrefix, logMessage);
+            std::lock_guard<std::mutex> lock(_instanceMutex);
+            if (_instance != nullptr)
+                logger = _instance->_logger;
+        }
+
+        if (logger == nullptr)
+        {
+            FallbackWrite(level, logMessage);
             return;
         }
-#if __linux
-        int logFd = fileno(GetInstance()->_logFile.get());
-        std::string logStr = logPrefix + logMessage + "\n";
-        if (flock(logFd, LOCK_EX) == 0)
+
+        try
         {
-            if (write(logFd, logStr.c_str(), logStr.size() * sizeof(char)) < 0)
-                fmt::print(stderr, "FATAL: write log failed: {0}\n", logMessage);
-            flock(logFd, LOCK_UN);
+            logger->log(ToSpdlogLevel(level), logMessage);
         }
-        else
+        catch (const std::exception &ex)
         {
-            fmt::print(stderr, "FATAL: flock failed: {0}\n", logMessage);
+            FallbackWrite(LoggerLevel::Error, fmt::format("Log sink failed: {}", ex.what()));
+            FallbackWrite(level, logMessage);
         }
-#endif
     }
 };
