@@ -26,10 +26,7 @@ cpp_files = [f for f in os.listdir('.') if f.endswith('.cpp')]
 
 for cpp_file in cpp_files:
     output_file = os.path.join(output_dir, os.path.splitext(cpp_file)[0])
-    if os.path.exists(output_file):
-        print(f"Skipping {cpp_file} as {output_file} already exists.")
-        continue
-    command = [compiler_name, '-std=c++20', '-O2', '-fsanitize=undefined', cpp_file, '-o', output_file]
+    command = [compiler_name, '-std=c++20', '-O2', cpp_file, '-o', output_file]
     try:
         subprocess.run(command, check=True)
         print(f"Compiled {cpp_file} to {output_file}")

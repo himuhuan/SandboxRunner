@@ -1,16 +1,19 @@
 add_subdirectory("Samples")
+add_subdirectory("SanitizerSamples")
 
 add_executable(SandboxTest
         SandboxTest.cpp
         SandboxTest.h
         AbiCompatibilityTest.cpp
         PolicyRegistryTest.cpp
-        ResourceConfigTest.cpp)
+        ResourceConfigTest.cpp
+        SanitizerSandboxTest.cpp)
 
 enable_testing()
 
 target_link_libraries(SandboxTest PRIVATE sandbox)
 sandboxrunner_configure_target(SandboxTest)
+add_dependencies(SandboxTest SANITIZER_SAMPLES_TESTS)
 
 find_package(GTest CONFIG REQUIRED)
 target_link_libraries(SandboxTest PRIVATE GTest::gtest GTest::gmock GTest::gmock_main)

@@ -8,19 +8,23 @@ int main() {
     cout.tie(nullptr);
     ll t;
     cin >> t;
+
+    // Drain input first so the loop below measures pure CPU behavior.
     while (t-- > 0) {
         int n;
         cin >> n;
-        ll sum = 0;
         for (int i = 0; i < n; ++i) {
             ll x;
             cin >> x;
-            // This is a CPU timeout
-            for (int j = 0; j < 1000000000; ++j) {
-                sum += x;
-            }
+            (void)x;
         }
-        cout << sum << endl;
     }
+
+    // Keep a volatile write in the loop so the compiler cannot fold it away.
+    volatile ll spin = 0;
+    while (true) {
+        spin = spin + 1;
+    }
+
     return 0;
 }
