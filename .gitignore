@@ -32,7 +32,11 @@ Testing/
 
 # Agent files
 agents.md
+claude.md
+CLAUDE.md
 
 # .NET build artifacts
 **/bin/
 **/obj/
+
+.*/
