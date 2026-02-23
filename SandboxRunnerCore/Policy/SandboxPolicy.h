@@ -21,7 +21,6 @@ struct PathAccessRule
 
 struct SandboxPolicy
 {
-    int PolicyId = 0;
     std::string Name;
 
     std::vector<int> AllowedSyscalls;

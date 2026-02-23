@@ -19,9 +19,10 @@ add_library(sandbox SHARED
 
 find_package(fmt REQUIRED CONFIG)
 find_package(spdlog REQUIRED CONFIG)
+find_package(nlohmann_json REQUIRED CONFIG)
 find_package(Threads REQUIRED)
 
-target_link_libraries(sandbox PRIVATE fmt::fmt spdlog::spdlog seccomp Threads::Threads)
+target_link_libraries(sandbox PRIVATE fmt::fmt spdlog::spdlog nlohmann_json::nlohmann_json seccomp Threads::Threads)
 sandboxrunner_configure_target(sandbox)
 
 add_dependencies(BUILD_ALL sandbox)

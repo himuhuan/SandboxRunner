@@ -28,7 +28,7 @@ InternalConfig InternalConfig::FromCConfig(const ::SandboxConfiguration *config)
     internal.MaxRealTime = config->MaxRealTime;
     internal.MaxOutputSize = config->MaxOutputSize;
     internal.MaxProcessCount = config->MaxProcessCount;
-    internal.Policy = config->Policy;
+    internal.Policy = config->Policy ? config->Policy : "";
 
     return internal;
 }

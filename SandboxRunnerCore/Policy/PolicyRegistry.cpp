@@ -1,18 +1,28 @@
 #include "PolicyRegistry.h"
 
-#include "../Sandbox.h"
-
+#include <algorithm>
 #include <cassert>
+#include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <memory>
+#include <mutex>
+#include <optional>
 #include <seccomp.h>
+#include <string>
+#include <unordered_map>
+
+#include <nlohmann/json.hpp>
 
 namespace SandboxPolicyEngine
 {
 namespace
 {
 
+using Json = nlohmann::json;
+
 const SandboxPolicy kDefaultPolicy = {
-    .PolicyId = DEFAULT,
-    .Name = "DEFAULT",
+    .Name = std::string(DEFAULT_POLICY_NAME),
     .AllowedSyscalls = {},
     .AllowedCapabilities = {},
     .PathAccessRules = {},
@@ -20,82 +30,234 @@ const SandboxPolicy kDefaultPolicy = {
     .AllowIO = true,
 };
 
-const SandboxPolicy kCxxProgramPolicy = {
-    .PolicyId = CXX_PROGRAM,
-    .Name = "CXX_PROGRAM",
-    .AllowedSyscalls =
+std::mutex gPolicyCacheMutex;
+std::unordered_map<std::string, std::shared_ptr<SandboxPolicy>> gPolicyCache;
+
+std::string TrimPolicyToken(std::string_view token)
+{
+    size_t begin = 0;
+    while (begin < token.size() && std::isspace(static_cast<unsigned char>(token[begin])))
+    {
+        ++begin;
+    }
+
+    size_t end = token.size();
+    while (end > begin && std::isspace(static_cast<unsigned char>(token[end - 1])))
+    {
+        --end;
+    }
+
+    return std::string(token.substr(begin, end - begin));
+}
+
+std::string NormalizePolicyName(std::string_view policyName)
+{
+    auto normalized = TrimPolicyToken(policyName);
+    if (normalized.empty())
+    {
+        normalized = std::string(DEFAULT_POLICY_NAME);
+    }
+
+    return normalized;
+}
+
+std::filesystem::path BuildPolicyPath(const std::string &policyName)
+{
+    std::filesystem::path path(policyName);
+    if (path.extension() != ".json")
+    {
+        path += ".json";
+    }
+    return path;
+}
+
+std::optional<int> TryResolveSyscall(const Json &syscallNode)
+{
+    if (syscallNode.is_number_integer())
+    {
+        return syscallNode.get<int>();
+    }
+
+    if (!syscallNode.is_string())
+    {
+        return std::nullopt;
+    }
+
+    std::string syscallName = TrimPolicyToken(syscallNode.get<std::string>());
+    if (syscallName.empty())
+    {
+        return std::nullopt;
+    }
+
+    constexpr std::string_view kScmpMacroPrefix = "SCMP_SYS(";
+    if (syscallName.rfind(kScmpMacroPrefix, 0) == 0 && syscallName.back() == ')')
+    {
+        syscallName = syscallName.substr(kScmpMacroPrefix.size(),
+                                         syscallName.size() - kScmpMacroPrefix.size() - 1);
+    }
+
+    const int syscallId = seccomp_syscall_resolve_name(syscallName.c_str());
+    if (syscallId == __NR_SCMP_ERROR)
+    {
+        return std::nullopt;
+    }
+
+    return syscallId;
+}
+
+std::optional<SandboxPolicy> LoadPolicyFromFile(const std::string &policyName)
+{
+    std::ifstream input(BuildPolicyPath(policyName));
+    if (!input.is_open())
+    {
+        return std::nullopt;
+    }
+
+    Json root;
+    try
+    {
+        input >> root;
+    }
+    catch (const Json::exception &)
+    {
+        return std::nullopt;
+    }
+
+    if (!root.is_object())
+    {
+        return std::nullopt;
+    }
+
+    const auto versionIt = root.find("Version");
+    if (versionIt == root.end() || !versionIt->is_string() || versionIt->get<std::string>() != "1.0")
+    {
+        return std::nullopt;
+    }
+
+    const auto seccompIt = root.find("Seccomp");
+    if (seccompIt == root.end() || !seccompIt->is_object())
+    {
+        return std::nullopt;
+    }
+
+    const auto whiteListIt = seccompIt->find("WhiteList");
+    if (whiteListIt == seccompIt->end() || !whiteListIt->is_array())
+    {
+        return std::nullopt;
+    }
+
+    SandboxPolicy policy;
+    policy.Name = policyName;
+
+    const auto allowIoIt = seccompIt->find("AllowIO");
+    if (allowIoIt != seccompIt->end())
+    {
+        if (!allowIoIt->is_boolean())
         {
-            SCMP_SYS(access),
-            SCMP_SYS(arch_prctl),
-            SCMP_SYS(brk),
-            SCMP_SYS(clock_gettime),
-            SCMP_SYS(clock_nanosleep),
-            SCMP_SYS(close),
-            SCMP_SYS(exit_group),
-            SCMP_SYS(faccessat),
-            SCMP_SYS(fcntl),
-            SCMP_SYS(fstat),
-            SCMP_SYS(futex),
-            SCMP_SYS(flock),
-            SCMP_SYS(getpid),
-            SCMP_SYS(gettid),
-            SCMP_SYS(getrandom),
-            SCMP_SYS(lseek),
-            SCMP_SYS(madvise),
-            SCMP_SYS(mmap),
-            SCMP_SYS(mprotect),
-            SCMP_SYS(munmap),
-            SCMP_SYS(newfstatat),
-            SCMP_SYS(pread64),
-            SCMP_SYS(prlimit64),
-            SCMP_SYS(prctl),
-            SCMP_SYS(pipe2),
-            SCMP_SYS(read),
-            SCMP_SYS(readlink),
-            SCMP_SYS(readlinkat),
-            SCMP_SYS(readv),
-            SCMP_SYS(rt_sigaction),
-            SCMP_SYS(rseq),
-            SCMP_SYS(sigaltstack),
-            SCMP_SYS(set_robust_list),
-            SCMP_SYS(set_tid_address),
-            SCMP_SYS(write),
-            SCMP_SYS(writev),
-            SCMP_SYS(seccomp),
-            SCMP_SYS(ioctl),
-            SCMP_SYS(rt_sigprocmask),
-        },
-    .AllowedCapabilities = {},
-    .PathAccessRules = {},
-    .RestrictExecveToProgramPath = true,
-    .AllowIO = true,
-};
+            return std::nullopt;
+        }
+        policy.AllowIO = allowIoIt->get<bool>();
+    }
+    else
+    {
+        policy.AllowIO = true;
+    }
+
+    const auto restrictExecveIt = seccompIt->find("RestrictExecveToProgramPath");
+    if (restrictExecveIt != seccompIt->end())
+    {
+        if (!restrictExecveIt->is_boolean())
+        {
+            return std::nullopt;
+        }
+        policy.RestrictExecveToProgramPath = restrictExecveIt->get<bool>();
+    }
+
+    for (const auto &syscallNode : *whiteListIt)
+    {
+        const auto syscall = TryResolveSyscall(syscallNode);
+        if (!syscall.has_value())
+        {
+            return std::nullopt;
+        }
+        policy.AllowedSyscalls.push_back(*syscall);
+    }
+
+    std::sort(policy.AllowedSyscalls.begin(), policy.AllowedSyscalls.end());
+    policy.AllowedSyscalls.erase(std::unique(policy.AllowedSyscalls.begin(), policy.AllowedSyscalls.end()),
+                                 policy.AllowedSyscalls.end());
+
+    return policy;
+}
 
 } // namespace
 
-const SandboxPolicy *TryResolvePolicy(const int policyId)
+bool IsDefaultPolicyName(const std::string_view policyName)
 {
-    switch (policyId)
-    {
-    case DEFAULT:
-        return &kDefaultPolicy;
-    case CXX_PROGRAM:
-        return &kCxxProgramPolicy;
-    default:
-        return nullptr;
-    }
+    return NormalizePolicyName(policyName) == DEFAULT_POLICY_NAME;
 }
 
-const SandboxPolicy &ResolvePolicy(const int policyId)
+bool IsDefaultPolicyName(const char *policyName)
 {
-    const auto *policy = TryResolvePolicy(policyId);
+    if (policyName == nullptr)
+    {
+        return true;
+    }
+
+    return IsDefaultPolicyName(std::string_view(policyName));
+}
+
+const SandboxPolicy *TryResolvePolicy(const std::string_view policyName)
+{
+    const auto normalizedPolicyName = NormalizePolicyName(policyName);
+    if (normalizedPolicyName == DEFAULT_POLICY_NAME)
+    {
+        return &kDefaultPolicy;
+    }
+
+    std::lock_guard lock(gPolicyCacheMutex);
+    if (const auto it = gPolicyCache.find(normalizedPolicyName); it != gPolicyCache.end())
+    {
+        return it->second.get();
+    }
+
+    auto loadedPolicy = LoadPolicyFromFile(normalizedPolicyName);
+    if (!loadedPolicy.has_value())
+    {
+        return nullptr;
+    }
+
+    auto policy = std::make_shared<SandboxPolicy>(std::move(*loadedPolicy));
+    const auto *resolvedPolicy = policy.get();
+    gPolicyCache.emplace(normalizedPolicyName, std::move(policy));
+    return resolvedPolicy;
+}
+
+const SandboxPolicy *TryResolvePolicy(const char *policyName)
+{
+    if (policyName == nullptr)
+    {
+        return &kDefaultPolicy;
+    }
+
+    return TryResolvePolicy(std::string_view(policyName));
+}
+
+const SandboxPolicy &ResolvePolicy(const std::string_view policyName)
+{
+    const auto *policy = TryResolvePolicy(policyName);
     assert(policy != nullptr);
     return *policy;
 }
 
-bool IsKnownPolicy(const int policyId)
+bool IsKnownPolicy(const std::string_view policyName)
 {
-    return TryResolvePolicy(policyId) != nullptr;
+    return TryResolvePolicy(policyName) != nullptr;
+}
+
+bool IsKnownPolicy(const char *policyName)
+{
+    return TryResolvePolicy(policyName) != nullptr;
 }
 
 } // namespace SandboxPolicyEngine

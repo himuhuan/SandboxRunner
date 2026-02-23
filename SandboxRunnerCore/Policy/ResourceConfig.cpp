@@ -89,7 +89,7 @@ ValidationResult ValidateSandboxConfiguration(const SandboxConfiguration *config
 
     if (!IsKnownPolicy(configuration->Policy))
     {
-        return CreateInvalidResult("Policy value is out of range");
+        return CreateInvalidResult("Policy is invalid or policy JSON file cannot be resolved");
     }
 
     if (configuration->EnvironmentVariablesCount > MAX_ENVIRONMENT_VARIABLES)

@@ -121,7 +121,7 @@ struct InternalConfig
     uint64_t MaxRealTime;
     uint64_t MaxOutputSize;
     int MaxProcessCount;
-    int Policy;
+    std::string Policy;
 
     // Convert from C ABI configuration
     static InternalConfig FromCConfig(const ::SandboxConfiguration *config);

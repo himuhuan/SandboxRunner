@@ -25,7 +25,7 @@ SandboxConfiguration BuildSanitizerConfig(const char *taskName,
     configuration.MaxMemoryToCrash = maxMemoryToCrashBytes;
     configuration.MaxOutputSize   = 10 * 1024;
     configuration.MaxProcessCount = 0;
-    configuration.Policy          = CXX_PROGRAM;
+    configuration.Policy          = "CXX_PROGRAM";
     return configuration;
 }
 

@@ -7,6 +7,7 @@
 
 #include "SandboxTest.h"
 #include <filesystem>
+#include <iostream>
 #include <string_view>
 
 #define INIT_SANDBOX_TESTCASE(TestName)                                                                                \
@@ -25,7 +26,7 @@
     configuration.MaxCpuTime      = 1000;                                                                              \
     configuration.MaxOutputSize   = 10 * 1024;                                                                         \
     configuration.MaxProcessCount = 0;                                                                                 \
-    configuration.Policy          = CXX_PROGRAM
+    configuration.Policy          = "CXX_PROGRAM"
 
 std::string_view GetStatusName(SandboxStatus status)
 {
@@ -105,6 +106,43 @@ void PrintResult(const SandboxResult &result)
     std::cout << "Signal: " << result.Signal << " " << std::quoted(GetSignalMessage(result.Signal)) << std::endl;
     std::cout << "===================================================================" << std::endl;
 }
+
+namespace
+{
+
+std::filesystem::path ResolveExecutableDirectory(const char *argv0)
+{
+    std::error_code errorCode;
+
+#ifdef __linux__
+    const auto executablePath = std::filesystem::read_symlink("/proc/self/exe", errorCode);
+    if (!errorCode && !executablePath.empty())
+    {
+        return executablePath.parent_path();
+    }
+    errorCode.clear();
+#endif
+
+    if (argv0 != nullptr && argv0[0] != '\0')
+    {
+        const auto executablePath = std::filesystem::absolute(argv0, errorCode);
+        if (!errorCode)
+        {
+            return executablePath.parent_path();
+        }
+        errorCode.clear();
+    }
+
+    const auto cwd = std::filesystem::current_path(errorCode);
+    if (!errorCode)
+    {
+        return cwd;
+    }
+
+    return {};
+}
+
+} // namespace
 
 TEST(SandboxTest, ExpectedAccepted)
 {
@@ -187,6 +225,19 @@ TEST(SandboxTest, ExpectedStackOverflow)
 
 int main(int argc, char **argv)
 {
+    const char *const argv0 = (argc > 0 && argv != nullptr) ? argv[0] : nullptr;
+    const auto executableDirectory = ResolveExecutableDirectory(argv0);
+    if (!executableDirectory.empty())
+    {
+        std::error_code errorCode;
+        std::filesystem::current_path(executableDirectory, errorCode);
+        if (errorCode)
+        {
+            std::cerr << "Warning: failed to set test working directory to " << executableDirectory
+                      << ": " << errorCode.message() << std::endl;
+        }
+    }
+
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

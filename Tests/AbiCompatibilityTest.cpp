@@ -33,7 +33,7 @@ struct SandboxConfigurationAbiBaseline
     uint64_t MaxRealTime;
     uint64_t MaxOutputSize;
     int MaxProcessCount;
-    int Policy;
+    const char *Policy;
 };
 
 struct SandboxResultAbiBaseline
@@ -52,9 +52,6 @@ using IsConfigurationValidSignature  = bool (*)(const SandboxConfiguration *);
 static_assert(std::is_same_v<decltype(&StartSandbox), StartSandboxSignature>, "StartSandbox signature changed");
 static_assert(std::is_same_v<decltype(&IsSandboxConfigurationVaild), IsConfigurationValidSignature>,
               "IsSandboxConfigurationVaild signature changed");
-
-static_assert(DEFAULT == 0, "SandboxSecurePolicy::DEFAULT numeric value changed");
-static_assert(CXX_PROGRAM == 1, "SandboxSecurePolicy::CXX_PROGRAM numeric value changed");
 
 static_assert(SANDBOX_STATUS_SUCCESS == 0, "SANDBOX_STATUS_SUCCESS numeric value changed");
 static_assert(SANDBOX_STATUS_MEMORY_LIMIT_EXCEEDED == 1, "SANDBOX_STATUS_MEMORY_LIMIT_EXCEEDED numeric value changed");

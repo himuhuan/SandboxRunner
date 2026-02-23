@@ -3,6 +3,7 @@
 #include "../Logger.h"
 #include "../InternalHelpers.h"
 #include "../Policy/ResourceConfig.h"
+#include "../Policy/PolicyRegistry.h"
 #include "SecurePolicy.h"
 #include "ErrorHandler.h"
 #include <csignal>
@@ -95,8 +96,10 @@ void RunSandboxProcess(const char *programPath, char *const *programArgs, const 
         }
     }
 
-    if (configuration->Policy != DEFAULT)
+    if (!SandboxPolicyEngine::IsDefaultPolicyName(configuration->Policy))
+    {
         Logger::Info("Applying custom rules: {0}", configuration->Policy);
+    }
 
     if (ApplyLinuxSecurePolicy(programPath, configuration))
     {
