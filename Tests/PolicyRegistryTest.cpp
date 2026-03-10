@@ -43,6 +43,18 @@ TEST(PolicyRegistryTest, ResolveCxxProgramPolicy)
     EXPECT_FALSE(policy->AllowedSyscalls.empty());
 }
 
+TEST(PolicyRegistryTest, ResolveCxxProgramPolicyNoCache)
+{
+    SandboxPolicyEngine::SandboxPolicy storage;
+    const auto *policy = SandboxPolicyEngine::TryResolvePolicyNoCache("CXX_PROGRAM", storage);
+    ASSERT_NE(policy, nullptr);
+
+    EXPECT_EQ(policy->Name, "CXX_PROGRAM");
+    EXPECT_TRUE(policy->RestrictExecveToProgramPath);
+    EXPECT_TRUE(policy->AllowIO);
+    EXPECT_FALSE(policy->AllowedSyscalls.empty());
+}
+
 TEST(PolicyRegistryTest, CxxProgramPolicyContainsCriticalSyscalls)
 {
     const auto *policy = SandboxPolicyEngine::TryResolvePolicy("CXX_PROGRAM");

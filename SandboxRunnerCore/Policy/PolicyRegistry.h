@@ -13,6 +13,8 @@ bool IsDefaultPolicyName(std::string_view policyName);
 bool IsDefaultPolicyName(const char *policyName);
 const SandboxPolicy *TryResolvePolicy(std::string_view policyName);
 const SandboxPolicy *TryResolvePolicy(const char *policyName);
+const SandboxPolicy *TryResolvePolicyNoCache(std::string_view policyName, SandboxPolicy &storage);
+const SandboxPolicy *TryResolvePolicyNoCache(const char *policyName, SandboxPolicy &storage);
 const SandboxPolicy &ResolvePolicy(std::string_view policyName);
 bool IsKnownPolicy(std::string_view policyName);
 bool IsKnownPolicy(const char *policyName);

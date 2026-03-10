@@ -243,6 +243,34 @@ const SandboxPolicy *TryResolvePolicy(const char *policyName)
     return TryResolvePolicy(std::string_view(policyName));
 }
 
+const SandboxPolicy *TryResolvePolicyNoCache(const std::string_view policyName, SandboxPolicy &storage)
+{
+    const auto normalizedPolicyName = NormalizePolicyName(policyName);
+    if (normalizedPolicyName == DEFAULT_POLICY_NAME)
+    {
+        return &kDefaultPolicy;
+    }
+
+    auto loadedPolicy = LoadPolicyFromFile(normalizedPolicyName);
+    if (!loadedPolicy.has_value())
+    {
+        return nullptr;
+    }
+
+    storage = std::move(*loadedPolicy);
+    return &storage;
+}
+
+const SandboxPolicy *TryResolvePolicyNoCache(const char *policyName, SandboxPolicy &storage)
+{
+    if (policyName == nullptr)
+    {
+        return &kDefaultPolicy;
+    }
+
+    return TryResolvePolicyNoCache(std::string_view(policyName), storage);
+}
+
 const SandboxPolicy &ResolvePolicy(const std::string_view policyName)
 {
     const auto *policy = TryResolvePolicy(policyName);
