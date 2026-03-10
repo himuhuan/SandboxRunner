@@ -7,6 +7,7 @@ add_executable(SandboxTest
         AbiCompatibilityTest.cpp
         PolicyRegistryTest.cpp
         ResourceConfigTest.cpp
+        SandboxRunnerCliTest.cpp
         SanitizerSandboxTest.cpp)
 
 enable_testing()
@@ -16,7 +17,9 @@ sandboxrunner_configure_target(SandboxTest)
 add_dependencies(SandboxTest SANITIZER_SAMPLES_TESTS)
 
 find_package(GTest CONFIG REQUIRED)
-target_link_libraries(SandboxTest PRIVATE GTest::gtest GTest::gmock GTest::gmock_main)
+find_package(nlohmann_json CONFIG REQUIRED)
+target_link_libraries(SandboxTest PRIVATE GTest::gtest GTest::gmock GTest::gmock_main nlohmann_json::nlohmann_json)
+add_dependencies(SandboxTest SandboxRunner)
 
 include(GoogleTest)
 gtest_discover_tests(SandboxTest
