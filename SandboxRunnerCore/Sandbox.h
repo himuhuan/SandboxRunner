@@ -23,14 +23,6 @@ extern "C"
      */
     [[maybe_unused]]  constexpr uint64_t MAX_MEMORY_FOR_SANDBOX_PROCESS = 0x7FFFFFFF;
 
-    enum SandboxSecurePolicy
-    {
-        DEFAULT     = 0,
-        CXX_PROGRAM = 1,
-
-        MAX_POLICY
-    };
-
     struct SandboxConfiguration
     {
         const char *TaskName;               // The name of the sandboxed process, cannot be NULL
@@ -66,7 +58,7 @@ extern "C"
         uint64_t MaxRealTime;   // The limit of real time, ms, 0 means no limit.
         uint64_t MaxOutputSize; // The limit of output size, byte, 0 means no limit.
         int MaxProcessCount; // The limit of child process count, -1 means no limit.
-        int Policy;          // The policy of the sandboxed process
+        const char *Policy;  // The policy name. "default" is reserved for built-in unrestricted mode.
     };
 
     struct SandboxResult

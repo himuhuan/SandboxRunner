@@ -114,15 +114,16 @@ bool ApplyPolicy(const char *programPath, const SandboxPolicyEngine::SandboxPoli
 
 bool ApplyLinuxSecurePolicy(const char *programPath, const SandboxConfiguration *config)
 {
-    const auto *policy = SandboxPolicyEngine::TryResolvePolicy(config->Policy);
+    if (SandboxPolicyEngine::IsDefaultPolicyName(config->Policy))
+    {
+        return true;
+    }
+
+    SandboxPolicyEngine::SandboxPolicy resolvedPolicy;
+    const auto *policy = SandboxPolicyEngine::TryResolvePolicyNoCache(config->Policy, resolvedPolicy);
     if (policy == nullptr)
     {
         return false;
-    }
-
-    if (policy->PolicyId == DEFAULT)
-    {
-        return true;
     }
 
     return ApplyPolicy(programPath, *policy);

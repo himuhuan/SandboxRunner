@@ -10,7 +10,7 @@ SandboxConfiguration CreateValidConfiguration()
     SandboxConfiguration config{};
     config.TaskName    = "resource-config-test";
     config.UserCommand = "/bin/echo";
-    config.Policy      = DEFAULT;
+    config.Policy      = "default";
 
     config.MaxMemoryToCrash = 0;
     config.MaxMemory        = 128 * 1024 * 1024;
@@ -38,10 +38,19 @@ TEST(ResourceConfigTest, ValidateKnownConfiguration)
     EXPECT_TRUE(result.IsValid) << result.Message;
 }
 
+TEST(ResourceConfigTest, ValidateNullPolicyFallsBackToDefault)
+{
+    auto config  = CreateValidConfiguration();
+    config.Policy = nullptr;
+
+    const auto result = SandboxPolicyEngine::ValidateSandboxConfiguration(&config);
+    EXPECT_TRUE(result.IsValid) << result.Message;
+}
+
 TEST(ResourceConfigTest, RejectUnknownPolicy)
 {
     auto config  = CreateValidConfiguration();
-    config.Policy = MAX_POLICY;
+    config.Policy = "NOT_EXISTS";
 
     const auto result = SandboxPolicyEngine::ValidateSandboxConfiguration(&config);
     EXPECT_FALSE(result.IsValid);

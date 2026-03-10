@@ -3,8 +3,6 @@ using System.Runtime.InteropServices;
 internal static class Program
 {
     private const int SandboxStatusSuccess = 0;
-    private const int CxxProgramPolicy = 1;
-
     [StructLayout(LayoutKind.Sequential)]
     private struct SandboxConfiguration
     {
@@ -24,7 +22,7 @@ internal static class Program
         public ulong MaxRealTime;
         public ulong MaxOutputSize;
         public int MaxProcessCount;
-        public int Policy;
+        public IntPtr Policy;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -84,7 +82,7 @@ internal static class Program
                 MaxRealTime = 3000,
                 MaxOutputSize = 10UL * 1024,
                 MaxProcessCount = 0,
-                Policy = CxxProgramPolicy,
+                Policy = ToNativeString("CXX_PROGRAM", allocations),
             };
 
             if (!IsSandboxConfigurationVaild(ref configuration))
