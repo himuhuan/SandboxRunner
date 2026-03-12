@@ -124,6 +124,18 @@ TEST(PolicyRegistryTest, CxxProgramPolicyMatchesLegacyAllowList)
     }
 }
 
+TEST(PolicyRegistryTest, CxxProgramPolicyRejectsHighRiskSyscalls)
+{
+    const auto *policy = SandboxPolicyEngine::TryResolvePolicy("CXX_PROGRAM");
+    ASSERT_NE(policy, nullptr);
+
+    EXPECT_FALSE(ContainsSyscall(policy->AllowedSyscalls, SCMP_SYS(socket)));
+    EXPECT_FALSE(ContainsSyscall(policy->AllowedSyscalls, SCMP_SYS(connect)));
+    EXPECT_FALSE(ContainsSyscall(policy->AllowedSyscalls, SCMP_SYS(fork)));
+    EXPECT_FALSE(ContainsSyscall(policy->AllowedSyscalls, SCMP_SYS(vfork)));
+    EXPECT_FALSE(ContainsSyscall(policy->AllowedSyscalls, SCMP_SYS(execve)));
+}
+
 TEST(PolicyRegistryTest, UnknownPolicyReturnsNull)
 {
     EXPECT_EQ(SandboxPolicyEngine::TryResolvePolicy("NOT_EXISTS"), nullptr);
