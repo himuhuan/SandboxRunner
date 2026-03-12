@@ -14,6 +14,7 @@ enable_testing()
 
 target_link_libraries(SandboxTest PRIVATE sandbox)
 sandboxrunner_configure_target(SandboxTest)
+add_dependencies(SandboxTest SAMPLES_TESTS)
 add_dependencies(SandboxTest SANITIZER_SAMPLES_TESTS)
 
 find_package(GTest CONFIG REQUIRED)
@@ -25,7 +26,7 @@ include(GoogleTest)
 gtest_discover_tests(SandboxTest
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/Tests
         DISCOVERY_TIMEOUT 30)
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/CXX_PROGRAM.json DESTINATION ${CMAKE_BINARY_DIR}/Tests)
+file(COPY ${CMAKE_SOURCE_DIR}/policies/CXX_PROGRAM.json DESTINATION ${CMAKE_BINARY_DIR}/Tests)
 
 find_program(DOTNET_EXECUTABLE NAMES dotnet)
 if (DOTNET_EXECUTABLE)

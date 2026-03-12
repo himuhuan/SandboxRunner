@@ -35,6 +35,22 @@ cmake --preset linux-release
 cmake --build out/build/linux-release --parallel
 ```
 
+### Docker Release Validation
+
+Day 0 release validation uses Docker on `ubuntu:22.04` to keep the build baseline aligned with the Linux deployment target while keeping the host environment flexible.
+
+From `libs/SandboxRunner`, run:
+
+```powershell
+./scripts/export-jammy-release.ps1
+```
+
+This builds and tests `linux-release` inside Docker, then exports:
+
+- `out/artifacts/linux-jammy-release/SandboxRunner`
+- `out/artifacts/linux-jammy-release/libsandbox.so`
+- `out/artifacts/linux-jammy-release/CXX_PROGRAM.json`
+
 ---
 
 ## CLI Usage
@@ -192,6 +208,8 @@ int status = StartSandbox(&config, &result);
 ## Policies
 
 Policies control which syscalls the sandboxed process is allowed to make. The built-in `"default"` policy is unrestricted. Custom policies are defined in JSON files.
+
+The production C++ execution policy is tracked at `policies/CXX_PROGRAM.json`. Downstream services should ship that file with the `SandboxRunner` binary and reference it by explicit path or working-directory-relative path at runtime.
 
 ### JSON Policy Format
 
